@@ -1,14 +1,14 @@
 # dependencies
-/node_modules
+node_modules
 
 # testing
-/coverage
+coverage
 
 # hardhat
-/cache
-/artifacts
-/typechain
-/typechain-types
+cache
+artifacts
+typechain
+typechain-types
 
 # env files
 .env
@@ -17,3 +17,4 @@
 # misc
 .DS_Store
 *.log
+
