@@ -1,3 +1,4 @@
+require("@nomicfoundation/hardhat-chai-matchers");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
@@ -28,14 +29,14 @@ describe("Governance", function () {
     describe("Deployment", function () {
         it("Should set deployer as owner and voter", async function () {
             expect(await governance.owner()).to.equal(owner.address);
-            expect(await governance.votingPower(owner.address)).to.equal(1);
+            expect(await governance.votingPower(owner.address)).to.equal(1n);
         });
     });
 
     describe("Voter Registration", function () {
         it("Should register voters with power", async function () {
             expect(await governance.votingPower(voter1.address)).to.equal(1);
-            expect(await governance.totalVoters()).to.equal(4); // owner + 3 voters
+            expect(await governance.totalVoters()).to.equal(4n); // owner + 3 voters
         });
 
         it("Should revert if non-owner registers voter", async function () {
@@ -97,13 +98,13 @@ describe("Governance", function () {
         it("Should allow voting for", async function () {
             await governance.connect(voter1).vote(proposalId, true);
             const proposal = await governance.getProposal(proposalId);
-            expect(proposal.votesFor).to.equal(1);
+            expect(proposal.votesFor).to.equal(1n);
         });
 
         it("Should allow voting against", async function () {
             await governance.connect(voter1).vote(proposalId, false);
             const proposal = await governance.getProposal(proposalId);
-            expect(proposal.votesAgainst).to.equal(1);
+            expect(proposal.votesAgainst).to.equal(1n);
         });
 
         it("Should revert double voting", async function () {
@@ -142,6 +143,10 @@ describe("Governance", function () {
             // Fast forward past voting period + execution delay
             await ethers.provider.send("evm_increaseTime", [70]); // 60s voting + 10s delay
             await ethers.provider.send("evm_mine");
+
+            // The DAO proposal tries to call `setGovernanceParams` which is `onlyOwner`.
+            // Ownership must be transferred to the DAO itself for the execution to succeed.
+            await governance.connect(owner).transferOwnership(await governance.getAddress());
 
             await governance.executeProposal(proposalId);
 
@@ -182,7 +187,7 @@ describe("Governance", function () {
 
             await governance.connect(voter1).cancelProposal(0);
             const proposal = await governance.getProposal(0);
-            expect(proposal.status).to.equal(5); // Cancelled
+            expect(proposal.status).to.equal(5n); // Cancelled
         });
 
         it("Should cancel a proposal (owner)", async function () {
@@ -191,7 +196,7 @@ describe("Governance", function () {
 
             await governance.connect(owner).cancelProposal(0);
             const proposal = await governance.getProposal(0);
-            expect(proposal.status).to.equal(5); // Cancelled
+            expect(proposal.status).to.equal(5n); // Cancelled
         });
 
         it("Should revert if unauthorized cancellation", async function () {

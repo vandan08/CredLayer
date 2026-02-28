@@ -1,3 +1,4 @@
+require("@nomicfoundation/hardhat-chai-matchers");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
@@ -49,6 +50,9 @@ describe("LendingPool", function () {
 
         // Link: CollateralVault → LendingPool
         await collateralVault.setLendingPool(await lendingPool.getAddress());
+
+        // Transfer CreditRegistry ownership to LendingPool so it can record events
+        await creditRegistry.transferOwnership(await lendingPool.getAddress());
 
         // Register borrower with A-band score for easier testing
         await creditRegistry.connect(oracle).registerBorrower(borrower.address);
@@ -109,7 +113,8 @@ describe("LendingPool", function () {
         });
 
         it("Should create a loan with valid signature", async function () {
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const signature = await signLoanApproval(
                 approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
             );
@@ -121,11 +126,12 @@ describe("LendingPool", function () {
             const loan = await lendingPool.getLoan(0);
             expect(loan.borrower).to.equal(borrower.address);
             expect(loan.amount).to.equal(loanAmount);
-            expect(loan.interestRate).to.equal(500); // 5% for A-band
+            expect(loan.interestRate).to.equal(500n); // 5% for A-band
         });
 
         it("Should emit LoanCreated event", async function () {
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const signature = await signLoanApproval(
                 approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
             );
@@ -136,7 +142,8 @@ describe("LendingPool", function () {
         });
 
         it("Should revert with invalid signature", async function () {
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             // Sign with wrong signer
             const badSignature = await signLoanApproval(
                 lender, borrower.address, loanAmount, duration, collateralAmount, deadline
@@ -148,7 +155,8 @@ describe("LendingPool", function () {
         });
 
         it("Should revert if borrower not registered", async function () {
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const signature = await signLoanApproval(
                 approvalSigner, lender.address, loanAmount, duration, collateralAmount, deadline
             );
@@ -173,7 +181,8 @@ describe("LendingPool", function () {
             await usdc.connect(borrower).approve(await collateralVault.getAddress(), collateralAmount);
             await collateralVault.connect(borrower).depositCollateral(collateralAmount);
 
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const signature = await signLoanApproval(
                 approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
             );
@@ -188,7 +197,7 @@ describe("LendingPool", function () {
             await lendingPool.connect(borrower).repay(loanId);
 
             const loan = await lendingPool.getLoan(loanId);
-            expect(loan.status).to.equal(1); // Repaid
+            expect(loan.status).to.equal(1n); // Repaid
         });
 
         it("Should emit LoanRepaid event", async function () {
@@ -202,7 +211,7 @@ describe("LendingPool", function () {
             await lendingPool.connect(borrower).repay(loanId);
 
             // Collateral should be unlocked back to borrower's available balance
-            expect(await collateralVault.lockedCollateral(borrower.address)).to.equal(0);
+            expect(await collateralVault.lockedCollateral(borrower.address)).to.equal(0n);
             expect(await collateralVault.collateralBalance(borrower.address)).to.equal(toUSDC(2000));
         });
     });
@@ -218,7 +227,8 @@ describe("LendingPool", function () {
             await collateralVault.connect(borrower).depositCollateral(collateralAmount);
 
             const duration = 7 * 24 * 60 * 60; // 7 days (minimum)
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const loanAmount = toUSDC(5000);
             const signature = await signLoanApproval(
                 approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
@@ -234,7 +244,7 @@ describe("LendingPool", function () {
             await lendingPool.connect(lender).liquidate(0);
 
             const loan = await lendingPool.getLoan(0);
-            expect(loan.status).to.equal(3); // Liquidated
+            expect(loan.status).to.equal(3n); // Liquidated
         });
 
         it("Should revert liquidation if loan not overdue", async function () {
@@ -247,7 +257,8 @@ describe("LendingPool", function () {
             await collateralVault.connect(borrower).depositCollateral(collateralAmount);
 
             const duration = 30 * 24 * 60 * 60;
-            const deadline = Math.floor(Date.now() / 1000) + 3600;
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
             const loanAmount = toUSDC(5000);
             const signature = await signLoanApproval(
                 approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
@@ -263,11 +274,11 @@ describe("LendingPool", function () {
 
     describe("View Functions", function () {
         it("Should return correct interest rate per band", async function () {
-            expect(await lendingPool.getInterestRate(borrower.address)).to.equal(500); // A-band = 5%
+            expect(await lendingPool.getInterestRate(borrower.address)).to.equal(500n); // A-band = 5%
         });
 
         it("Should return pool utilization", async function () {
-            expect(await lendingPool.getUtilizationRate()).to.equal(0); // No deposits
+            expect(await lendingPool.getUtilizationRate()).to.equal(0n); // No deposits
         });
     });
 });

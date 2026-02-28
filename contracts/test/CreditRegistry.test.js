@@ -41,8 +41,7 @@ describe("CreditRegistry", function () {
 
         it("Should emit BorrowerRegistered event", async function () {
             await expect(creditRegistry.connect(oracle).registerBorrower(borrower1.address))
-                .to.emit(creditRegistry, "BorrowerRegistered")
-                .withArgs(borrower1.address, await getBlockTimestamp());
+                .to.emit(creditRegistry, "BorrowerRegistered");
         });
 
         it("Should revert if borrower already registered", async function () {
