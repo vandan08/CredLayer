@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# hardhat
+/cache
+/artifacts
+/typechain
+/typechain-types
+
+# env files
+.env
+.env.example
+
+# misc
+.DS_Store
+*.log
