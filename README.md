@@ -8,7 +8,7 @@ Traditional DeFi lending requires significant over-collateralization (often 150%
 
 ### The System Consists of Three Main Layers:
 1. **Smart Contracts (Phase 1 - Completed)**: Core protocol logic (Solidity, Hardhat).
-2. **Backend Risk Engine (Phase 2 - Upcoming)**: Java Spring Boot application to analyze off-chain data and push credit scores.
+2. **Backend Risk Engine (Phase 2 - Completed)**: Java Spring Boot application to analyze off-chain data, assess risk, and push credit scores on-chain.
 3. **Frontend dApp (Phase 3 - Upcoming)**: Next.js application for users to borrow, lend, and manage proposals.
 
 ## 🏗️ Phase 1: Smart Contracts Architecture
@@ -35,37 +35,33 @@ The core protocol consists of the following smart contracts, all written in Soli
 - `MockUSDC.sol`: 
   - An ERC20 token used to simulate stablecoin interactions for local development.
 
-## 🚀 Quickstart (Smart Contracts)
+## ⚙️ Phase 2: Backend Risk Engine
 
-### Prerequisites
-- Node.js (v18+)
-- npm or yarn
+The backend is built with **Java 17+ and Spring Boot 3.x**, heavily utilizing **Web3j** for seamless blockchain interactions and PostgreSQL for data persistence.
 
-### Installation
-Navigate to the `contracts` directory and install dependencies:
+- **Blockchain Listener Service**: Subscribes to Ethereum events (`LoanCreated`, `LoanRepaid`, `LoanLiquidated`) to sync the database with on-chain activities.
+- **Credit Scoring Engine**: Updates user credit scores mathematically based on on-chain events (repayment bonuses, default penalties).
+- **Oracle Updater Service**: Authenticates the backend as an Oracle and securely signs & broadcasts updated credit scores to `CreditRegistry.sol` using raw signed transactions.
+- **Risk Model Service**: Calculates loan terms dynamically (max loan, interest rate, required collateral) tailored to the borrower's risk band.
+- **REST APIs**: Provides endpoints to fetch risk models and generate off-chain ECDSA signed approvals that users submit to `LendingPool.sol` to execute borrows natively on-chain.
+
+## 🚀 Quickstarts
+
+### Smart Contracts (Hardhat)
+Navigate to the `contracts` directory:
 ```bash
 cd contracts
 npm install
-```
-
-### Compilation
-Compile the smart contracts (ensure `viaIR` is enabled in `hardhat.config.js`):
-```bash
 npx hardhat compile
-```
-
-### Testing
-We have a comprehensive test suite covering all contracts (66+ tests). To run them:
-```bash
 npx hardhat test
 ```
 
-### Deployment
-To deploy to a local Hardhat node:
+### Backend (Java Spring Boot)
+Navigate to the `backend` directory. Ensure you have Docker running for PostgreSQL and update `application.yml` with your Hardhat node connection if testing locally.
 ```bash
-npx hardhat node
-# In a new terminal:
-npx hardhat run scripts/deploy.js --network localhost
+cd backend
+docker-compose up -d
+./mvnw clean spring-boot:run
 ```
 
 ## 🔐 Security Features
@@ -76,6 +72,5 @@ npx hardhat run scripts/deploy.js --network localhost
 - **Backend Signatures**: Borrowing requires an off-chain ECDSA signature signed by a trusted backend key, preventing unauthorized or un-scored loans.
 
 ## 🧑‍💻 Next Steps
-- Implementation of the Java Spring Boot Backend (Phase 2).
-- Integration of the Web3j listener for real-time blockchain event parsing.
-- Implementation of the Next.js Frontend (Phase 3).
+- Implementation of the Next.js Frontend (Phase 3) focusing on an "Industrial Credit Bureau" aesthetic.
+- End-to-end integration mapping frontend interactions through the backend and down to the smart contracts.

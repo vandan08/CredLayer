@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeCredit Protocol — Borrower Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #F2EFE8;
+    --surface: #E8E4DB;
+    --surface-2: #DDD9CF;
+    --ink: #1A1915;
+    --ink-muted: #5C5A54;
+    --ink-faint: #A8A49C;
+    --green: #1B4332;
+    --amber: #B45309;
+    --red: #9B1C1C;
+    --chartreuse: #C6F135;
+    --border: #C8C4BB;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    position: fixed;
+    width: 12px;
+    height: 12px;
+    background: var(--ink);
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s;
+    mix-blend-mode: multiply;
+  }
+  .cursor.clicking { transform: scale(0.6); }
+
+  /* Sidebar Nav */
+  .sidebar {
+    width: 220px;
+    min-height: 100vh;
+    border-right: 1px solid var(--border);
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo span {
+    display: block;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 400;
+    letter-spacing: 2px;
+    color: var(--ink-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  nav ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+
+  nav ul li a {
+    display: block;
+    padding: 10px 0;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ink-muted);
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s;
+    font-weight: 500;
+  }
+
+  nav ul li a:hover { color: var(--ink); }
+  nav ul li.active a {
+    color: var(--ink);
+    border-bottom-color: var(--chartreuse);
+    border-bottom-width: 2px;
+  }
+
+  .wallet-info {
+    margin-top: auto;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .wallet-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+
+  .wallet-addr {
+    font-size: 10px;
+    color: var(--ink-muted);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  .wallet-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--green);
+  }
+
+  .wallet-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    display: block;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Main Content */
+  .main {
+    margin-left: 220px;
+    flex: 1;
+    min-height: 100vh;
+  }
+
+  /* Top ticker bar */
+  .ticker-bar {
+    background: var(--ink);
+    color: var(--chartreuse);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .ticker-inner {
+    display: inline-block;
+    animation: ticker 30s linear infinite;
+    padding-left: 100%;
+  }
+
+  .ticker-inner span {
+    margin-right: 48px;
+    opacity: 0.9;
+  }
+
+  .ticker-inner span.sep {
+    opacity: 0.4;
+    margin-right: 48px;
+  }
+
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Content area */
+  .content {
+    padding: 56px 64px;
+    max-width: 1200px;
+  }
+
+  /* Section header */
+  .section-number {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-number::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .page-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .page-subtitle {
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 1px;
+    margin-bottom: 48px;
+  }
+
+  /* Score + Overview layout */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .score-block {
+    padding: 48px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .score-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 16px;
+  }
+
+  .score-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 120px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -4px;
+    color: var(--ink);
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .score-number .digit {
+    display: inline-block;
+    animation: rollUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  .score-number .digit:nth-child(1) { animation-delay: 0.3s; }
+  .score-number .digit:nth-child(2) { animation-delay: 0.45s; }
+  .score-number .digit:nth-child(3) { animation-delay: 0.6s; }
+
+  @keyframes rollUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .score-bg-text {
+    position: absolute;
+    font-family: 'Playfair Display', serif;
+    font-size: 280px;
+    font-weight: 900;
+    color: var(--surface);
+    bottom: -60px;
+    right: -20px;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+
+  .band-tag {
+    display: inline-block;
+    background: var(--green);
+    color: var(--chartreuse);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    font-weight: 600;
+    margin-top: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .score-delta {
+    font-size: 11px;
+    color: var(--green);
+    margin-top: 10px;
+    letter-spacing: 1px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* VU Meter / Score gauge */
+  .gauge-block {
+    padding: 48px;
+  }
+
+  .gauge-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 24px;
+  }
+
+  .vu-meter {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 80px;
+    margin-bottom: 12px;
+  }
+
+  .vu-segment {
+    flex: 1;
+    background: var(--surface-2);
+    transition: background 0.3s, height 0.5s;
+    height: 40%;
+  }
+
+  .vu-segment.active.band-d { background: var(--red); }
+  .vu-segment.active.band-c { background: var(--amber); }
+  .vu-segment.active.band-b { background: var(--ink); }
+  .vu-segment.active.band-a { background: var(--chartreuse); }
+
+  .vu-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border: 1px solid var(--border);
+    border-top: none;
+    margin-bottom: 40px;
+  }
+
+  .stat-block {
+    padding: 28px 32px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    opacity: 0;
+    animation: fadeIn 0.5s forwards;
+  }
+
+  .stat-block:last-child { border-right: none; }
+
+  .stat-block:nth-child(1) { animation-delay: 0.8s; }
+  .stat-block:nth-child(2) { animation-delay: 0.95s; }
+  .stat-block:nth-child(3) { animation-delay: 1.1s; }
+
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .stat-sub {
+    font-size: 10px;
+    color: var(--ink-muted);
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Two column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 60fr 40fr;
+    gap: 40px;
+    margin-bottom: 40px;
+  }
+
+  /* Loan Terms Panel */
+  .panel {
+    border: 1px solid var(--border);
+  }
+
+  .panel-header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .panel-date {
+    font-size: 9px;
+    color: var(--ink-faint);
+    letter-spacing: 1px;
+  }
+
+  .panel-body { padding: 28px; }
+
+  /* Ledger table */
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .ledger thead tr {
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .ledger th {
+    padding: 8px 0;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .ledger th:last-child,
+  .ledger td:last-child { text-align: right; }
+
+  .ledger tbody tr {
+    border-bottom: 1px solid var(--surface-2);
+  }
+
+  .ledger tbody tr:hover { background: var(--surface); }
+
+  .ledger td {
+    padding: 12px 0;
+    color: var(--ink);
+    vertical-align: middle;
+  }
+
+  .ledger .loan-id {
+    color: var(--ink-faint);
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .status-badge {
+    display: inline-block;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    font-weight: 600;
+  }
+
+  .status-badge.repaid {
+    background: rgba(27,67,50,0.12);
+    color: var(--green);
+  }
+
+  .status-badge.active {
+    background: rgba(198,241,53,0.3);
+    color: #4A5E00;
+  }
+
+  .status-badge.overdue {
+    background: rgba(155,28,28,0.12);
+    color: var(--red);
+  }
+
+  /* Loan Request Form */
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .form-control {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+  }
+
+  .form-control:focus { border-color: var(--ink); }
+
+  .range-wrap { position: relative; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 2px;
+    background: var(--surface-2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--ink);
+    cursor: pointer;
+  }
+
+  .range-output {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+
+  /* Risk breakdown */
+  .risk-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--surface-2);
+    font-size: 11px;
+  }
+
+  .risk-item:last-child { border-bottom: none; }
+
+  .risk-key {
+    color: var(--ink-muted);
+    letter-spacing: 0.5px;
+  }
+
+  .risk-val {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .risk-val.good { color: var(--green); }
+  .risk-val.warn { color: var(--amber); }
+
+  /* Borrow button */
+  .borrow-btn {
+    width: 100%;
+    background: var(--ink);
+    color: var(--bg);
+    border: 2px solid var(--ink);
+    padding: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    cursor: none;
+    transition: all 0.1s;
+    margin-top: 20px;
+    display: block;
+  }
+
+  .borrow-btn:active {
+    box-shadow: inset 0 0 0 2px var(--ink);
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .borrow-btn:hover {
+    background: var(--green);
+    border-color: var(--green);
+    color: var(--chartreuse);
+  }
+
+  /* Sparkline */
+  .sparkline-wrap {
+    padding: 28px;
+  }
+
+  .sparkline-title {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 20px;
+  }
+
+  .spark-canvas {
+    width: 100%;
+    height: 80px;
+    display: block;
+  }
+
+  .spark-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--ink-faint);
+    letter-spacing: 1px;
+    margin-top: 8px;
+  }
+
+  /* Loading state */
+  .loading-blink {
+    display: inline-block;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Horizontal rule divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Annotation (left margin note style) */
+  .annotation {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    writing-mode: horizontal-tb;
+    padding: 4px 0;
+    display: block;
+  }
+
+  /* Page load animation */
+  .animate-in {
+    opacity: 0;
+    animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-in:nth-child(1) { animation-delay: 0.1s; }
+  .animate-in:nth-child(2) { animation-delay: 0.2s; }
+  .animate-in:nth-child(3) { animation-delay: 0.3s; }
+  .animate-in:nth-child(4) { animation-delay: 0.4s; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Pool health bar */
+  .pool-bar-wrap {
+    padding: 20px 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  .pool-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+  }
+
+  .pool-bar-track {
+    height: 4px;
+    background: var(--surface-2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pool-bar-fill {
+    height: 100%;
+    background: var(--chartreuse);
+    animation: barGrow 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1.4s both;
+    transform-origin: left;
+    transform: scaleX(0);
+  }
+
+  @keyframes barGrow {
+    to { transform: scaleX(1); }
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; padding: 20px 16px; }
+    .logo span, nav ul li a span, .wallet-info { display: none; }
+    .main { margin-left: 60px; }
+    .content { padding: 32px 24px; }
+    .two-col { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .score-block { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    DeCredit
+    <span>Protocol v1.0</span>
+  </div>
+  <nav>
+    <ul>
+      <li class="active"><a href="#">Dashboard</a></li>
+      <li><a href="#">Borrow</a></li>
+      <li><a href="#">Lend</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">Analytics</a></li>
+      <li><a href="#">Governance</a></li>
+    </ul>
+  </nav>
+  <div class="wallet-info">
+    <div class="wallet-label">Connected</div>
+    <div class="wallet-addr">0x71C7...4E3F</div>
+    <div class="wallet-status">Mainnet</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Ticker -->
+  <div class="ticker-bar">
+    <div class="ticker-inner">
+      <span>POOL UTILIZATION 72.4%</span><span class="sep">——</span>
+      <span>BAND A RATE 5.00%</span><span class="sep">——</span>
+      <span>BAND B RATE 9.00%</span><span class="sep">——</span>
+      <span>BAND C RATE 14.00%</span><span class="sep">——</span>
+      <span>TOTAL VALUE LOCKED $4.21M</span><span class="sep">——</span>
+      <span>ACTIVE LOANS 1,204</span><span class="sep">——</span>
+      <span>AVG CREDIT SCORE 718</span><span class="sep">——</span>
+      <span>DEFAULT RATE 0.82%</span><span class="sep">——</span>
+      <span>POOL UTILIZATION 72.4%</span><span class="sep">——</span>
+      <span>BAND A RATE 5.00%</span><span class="sep">——</span>
+      <span>BAND B RATE 9.00%</span><span class="sep">——</span>
+      <span>TOTAL VALUE LOCKED $4.21M</span><span class="sep">——</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="animate-in">
+      <div class="section-number">01 — Borrower Overview</div>
+      <h1 class="page-title">Credit Dashboard</h1>
+      <p class="page-subtitle">Last evaluated: <span id="lastUpdated">Loading<span class="loading-blink">_</span></span></p>
+    </div>
+
+    <!-- Score + Gauge -->
+    <div class="overview-grid animate-in">
+      <div class="score-block">
+        <div class="score-label">Credit Score</div>
+        <div class="score-number" id="scoreDisplay">
+          <span class="digit">7</span><span class="digit">4</span><span class="digit">2</span>
+        </div>
+        <div class="score-bg-text">A</div>
+        <div class="band-tag">Risk Band A</div>
+        <div class="score-delta">▲ +18 since last evaluation</div>
+      </div>
+
+      <div class="gauge-block">
+        <div class="gauge-label">Score Range Indicator</div>
+        <div class="vu-meter" id="vuMeter"></div>
+        <div class="vu-labels">
+          <span>300 — D</span>
+          <span>500 — C</span>
+          <span>650 — B</span>
+          <span>750+ — A</span>
+        </div>
+
+        <div class="risk-item">
+          <span class="risk-key">Max Loan Amount</span>
+          <span class="risk-val good">$24,000 USDC</span>
+        </div>
+        <div class="risk-item">
+          <span class="risk-key">Required Collateral</span>
+          <span class="risk-val good">40%</span>
+        </div>
+        <div class="risk-item">
+          <span class="risk-key">Interest Rate</span>
+          <span class="risk-val good">5.00% APR</span>
+        </div>
+        <div class="risk-item">
+          <span class="risk-key">Liquidation Threshold</span>
+          <span class="risk-val warn">35%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row animate-in">
+      <div class="stat-block">
+        <div class="stat-label">Total Borrowed</div>
+        <div class="stat-value">$8,400</div>
+        <div class="stat-sub">Across 3 completed loans</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Repayment Rate</div>
+        <div class="stat-value">100%</div>
+        <div class="stat-sub">0 defaults on record</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Pool Participation</div>
+        <div class="stat-value">$2,000</div>
+        <div class="stat-sub">Supplied as liquidity</div>
+      </div>
+    </div>
+
+    <div class="two-col animate-in">
+
+      <!-- Left: Loan history ledger -->
+      <div>
+        <div class="section-number" style="margin-bottom:0">02 — Loan Ledger</div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">
+            <span class="panel-title">Repayment History</span>
+            <span class="panel-date">All time</span>
+          </div>
+          <div class="panel-body">
+            <table class="ledger">
+              <thead>
+                <tr>
+                  <th>Loan ID</th>
+                  <th>Amount</th>
+                  <th>Duration</th>
+                  <th>Rate</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="loan-id">#LN-00041</span></td>
+                  <td>$3,200</td>
+                  <td>30 days</td>
+                  <td>5.00%</td>
+                  <td><span class="status-badge active">Active</span></td>
+                </tr>
+                <tr>
+                  <td><span class="loan-id">#LN-00038</span></td>
+                  <td>$2,800</td>
+                  <td>45 days</td>
+                  <td>5.00%</td>
+                  <td><span class="status-badge repaid">Repaid</span></td>
+                </tr>
+                <tr>
+                  <td><span class="loan-id">#LN-00031</span></td>
+                  <td>$1,600</td>
+                  <td>30 days</td>
+                  <td>7.20%</td>
+                  <td><span class="status-badge repaid">Repaid</span></td>
+                </tr>
+                <tr>
+                  <td><span class="loan-id">#LN-00024</span></td>
+                  <td>$800</td>
+                  <td>14 days</td>
+                  <td>9.00%</td>
+                  <td><span class="status-badge repaid">Repaid</span></td>
+                </tr>
+                <tr>
+                  <td><span class="loan-id">#LN-00017</span></td>
+                  <td>$2,100</td>
+                  <td>60 days</td>
+                  <td>14.00%</td>
+                  <td><span class="status-badge repaid">Repaid</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pool health bar at bottom of ledger panel -->
+          <div class="pool-bar-wrap">
+            <div class="pool-bar-label">
+              <span>Pool Utilization</span>
+              <span>72.4% — $3.04M / $4.21M</span>
+            </div>
+            <div class="pool-bar-track">
+              <div class="pool-bar-fill" style="width:72.4%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sparkline -->
+        <div class="panel" style="margin-top: 24px;">
+          <div class="panel-header">
+            <span class="panel-title">Score History</span>
+            <span class="panel-date">Last 12 months</span>
+          </div>
+          <div class="sparkline-wrap">
+            <canvas class="spark-canvas" id="sparkline" width="600" height="80"></canvas>
+            <div class="spark-labels">
+              <span>Mar '24</span>
+              <span>Jun '24</span>
+              <span>Sep '24</span>
+              <span>Dec '24</span>
+              <span>Mar '25</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Borrow form -->
+      <div>
+        <div class="section-number" style="margin-bottom:0">03 — New Loan Request</div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">
+            <span class="panel-title">Request Loan</span>
+            <span class="panel-date">Band A terms</span>
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label class="form-label">Loan Amount (USDC)</label>
+              <div class="range-output" id="loanAmountDisplay">$5,000</div>
+              <input type="range" min="500" max="24000" step="500" value="5000" id="loanRange">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ink-faint);letter-spacing:1px;margin-top:6px;">
+                <span>MIN $500</span><span>MAX $24,000</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:24px">
+              <label class="form-label">Duration</label>
+              <select class="form-control">
+                <option>14 days</option>
+                <option selected>30 days</option>
+                <option>45 days</option>
+                <option>60 days</option>
+                <option>90 days</option>
+              </select>
+            </div>
+
+            <hr class="divider" style="margin:24px 0">
+
+            <div class="annotation">Risk Breakdown — Band A Terms</div>
+            <div style="margin-top:12px">
+              <div class="risk-item">
+                <span class="risk-key">Collateral Required</span>
+                <span class="risk-val good" id="collateralCalc">$2,000</span>
+              </div>
+              <div class="risk-item">
+                <span class="risk-key">Interest Rate</span>
+                <span class="risk-val good">5.00% APR</span>
+              </div>
+              <div class="risk-item">
+                <span class="risk-key">Total Repayable</span>
+                <span class="risk-val" id="totalRepay">$5,020.55</span>
+              </div>
+              <div class="risk-item">
+                <span class="risk-key">Oracle Approval</span>
+                <span class="risk-val good">Signed ✓</span>
+              </div>
+            </div>
+
+            <button class="borrow-btn" id="borrowBtn">Request Loan →</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX - 6 + 'px';
+    cursor.style.top = e.clientY - 6 + 'px';
+  });
+  document.addEventListener('mousedown', () => cursor.classList.add('clicking'));
+  document.addEventListener('mouseup', () => cursor.classList.remove('clicking'));
+
+  // Last updated timestamp
+  document.getElementById('lastUpdated').textContent = new Date().toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+
+  // VU Meter build
+  const meter = document.getElementById('vuMeter');
+  const score = 742;
+  const maxScore = 850;
+  const segments = 28;
+  const bandBreaks = { d: 0.35, c: 0.59, b: 0.76, a: 1.0 };
+
+  for (let i = 0; i < segments; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'vu-segment';
+
+    const pct = (i + 1) / segments;
+    let band = '';
+    if (pct <= bandBreaks.d) band = 'band-d';
+    else if (pct <= bandBreaks.c) band = 'band-c';
+    else if (pct <= bandBreaks.b) band = 'band-b';
+    else band = 'band-a';
+
+    // Height variation for VU look
+    const heightPct = 30 + (i / segments) * 70;
+    seg.style.height = heightPct + '%';
+
+    const scorePct = (score - 300) / (maxScore - 300);
+    if (pct <= scorePct) {
+      setTimeout(() => {
+        seg.classList.add('active', band);
+      }, 900 + i * 35);
+    }
+
+    meter.appendChild(seg);
+  }
+
+  // Loan range slider
+  const loanRange = document.getElementById('loanRange');
+  const loanDisplay = document.getElementById('loanAmountDisplay');
+  const collateralCalc = document.getElementById('collateralCalc');
+  const totalRepay = document.getElementById('totalRepay');
+
+  function updateLoan() {
+    const v = parseInt(loanRange.value);
+    loanDisplay.textContent = '$' + v.toLocaleString();
+    const collateral = Math.round(v * 0.4);
+    collateralCalc.textContent = '$' + collateral.toLocaleString();
+    // 5% APR, 30 days
+    const interest = v * 0.05 * (30 / 365);
+    totalRepay.textContent = '$' + (v + interest).toFixed(2);
+  }
+
+  loanRange.addEventListener('input', updateLoan);
+  updateLoan();
+
+  // Borrow button feedback
+  document.getElementById('borrowBtn').addEventListener('click', function() {
+    this.textContent = 'Submitting to Oracle_';
+    let dots = 0;
+    const interval = setInterval(() => {
+      dots = (dots + 1) % 4;
+      this.textContent = 'Submitting to Oracle' + '.'.repeat(dots);
+    }, 400);
+    setTimeout(() => {
+      clearInterval(interval);
+      this.textContent = 'Signed & Approved ✓';
+      this.style.background = 'var(--green)';
+      this.style.borderColor = 'var(--green)';
+      this.style.color = 'var(--chartreuse)';
+      setTimeout(() => {
+        this.textContent = 'Request Loan →';
+        this.style.background = '';
+        this.style.borderColor = '';
+        this.style.color = '';
+      }, 3000);
+    }, 2000);
+  });
+
+  // Sparkline canvas
+  const canvas = document.getElementById('sparkline');
+  const ctx = canvas.getContext('2d');
+
+  const dataPoints = [480, 510, 495, 540, 580, 610, 590, 640, 670, 700, 728, 742];
+  const W = canvas.width;
+  const H = canvas.height;
+  const minV = 400, maxV = 800;
+
+  function px(val) {
+    return H - ((val - minV) / (maxV - minV)) * (H - 20) - 4;
+  }
+
+  function drawSparkline(progress) {
+    ctx.clearRect(0, 0, W, H);
+
+    const pointCount = Math.max(2, Math.floor(progress * dataPoints.length));
+    const pts = dataPoints.slice(0, pointCount);
+
+    // Dot grid
+    ctx.fillStyle = '#C8C4BB';
+    for (let gx = 0; gx <= 12; gx++) {
+      for (let gy = 0; gy <= 4; gy++) {
+        ctx.fillRect(
+          (gx / 12) * W,
+          4 + (gy / 4) * (H - 8),
+          1, 1
+        );
+      }
+    }
+
+    if (pts.length < 2) return;
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = '#1A1915';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+
+    pts.forEach((v, i) => {
+      const x = (i / (dataPoints.length - 1)) * W;
+      const y = px(v);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // End dot
+    const lastX = ((pts.length - 1) / (dataPoints.length - 1)) * W;
+    const lastY = px(pts[pts.length - 1]);
+    ctx.fillStyle = '#C6F135';
+    ctx.strokeStyle = '#1A1915';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(lastX - 4, lastY - 4, 8, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Start + end labels
+    ctx.fillStyle = '#5C5A54';
+    ctx.font = '10px IBM Plex Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText('480', 4, px(480) - 6);
+    if (pts.length === dataPoints.length) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#1A1915';
+      ctx.font = 'bold 11px IBM Plex Mono';
+      ctx.fillText('742', W - 4, px(742) - 8);
+    }
+  }
+
+  // Animate sparkline drawing
+  let progress = 0;
+  const sparkAnim = setInterval(() => {
+    progress += 0.04;
+    if (progress >= 1) { progress = 1; clearInterval(sparkAnim); }
+    drawSparkline(progress);
+  }, 30);
+</script>
+</body>
+</html>

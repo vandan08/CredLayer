@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: credlayer-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/credlayer_db
+    username: credlayer
+    password: credpassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# Web3j Configuration
+web3j:
+  client-address: http://127.0.0.1:8545
+
+# CredLayer Settings
+credlayer:
+  contracts:
+    credit-registry: ""       # To be filled after deployment
+    lending-pool: ""          # To be filled after deployment
+  oracle:
+    private-key: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # Default Hardhat Account #0
+
+server:
+  port: 8080
