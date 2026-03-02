@@ -18,3 +18,5 @@ typechain-types
 .DS_Store
 *.log
 
+/backend/.idea
+*.gitignore
