@@ -1,0 +1,424 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F2EFE8;
+  --surface: #E8E4DB;
+  --surface-2: #DDD9CF;
+  --ink: #1A1915;
+  --ink-muted: #5C5A54;
+  --ink-faint: #A8A49C;
+  --border: #C8C4BB;
+  --green: #1B4332;
+  --amber: #B45309;
+  --crimson: #9B1C1C;
+  --chartreuse: #C6F135;
+}
+
+* {
+  cursor: none !important;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCROLLBAR — brutalist thin rail
+   ═══════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ink);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--chartreuse);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SELECTION — chartreuse flash
+   ═══════════════════════════════════════════════════════════════ */
+::selection {
+  background: var(--chartreuse);
+  color: var(--ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE TRANSITIONS — instant shutter cut
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes pageShutter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  40% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+main>div>div {
+  animation: pageShutter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BLINKING CURSOR — loading indicator
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.loading-cursor::after {
+  content: "_";
+  animation: blink 0.8s step-end infinite;
+  color: var(--ink);
+  margin-left: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NOISE TEXTURE — subtle paper grain overlay
+   ═══════════════════════════════════════════════════════════════ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MECHANICAL COUNTER — score digit roll-up
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes digitRollUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.digit-roll {
+  display: inline-block;
+  animation: digitRollUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUTTON PRESS — physical key inset
+   ═══════════════════════════════════════════════════════════════ */
+button:active:not(:disabled) {
+  box-shadow: inset 0 2px 0 0 rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(1px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCANLINE — subtle CRT effect on panels
+   ═══════════════════════════════════════════════════════════════ */
+.panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg,
+      transparent,
+      transparent 2px,
+      rgba(26, 25, 21, 0.015) 2px,
+      rgba(26, 25, 21, 0.015) 4px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GLITCH FLASH — used on tx confirmations
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes txFlash {
+  0% {
+    background: var(--chartreuse);
+  }
+
+  15% {
+    background: transparent;
+  }
+
+  30% {
+    background: var(--chartreuse);
+  }
+
+  45% {
+    background: transparent;
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+.tx-flash {
+  animation: txFlash 0.4s linear;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATUS PULSE — live connection indicator
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes statusPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(198, 241, 53, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(198, 241, 53, 0);
+  }
+}
+
+.status-dot {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BAR GROW — utilization bar animation
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STAGGER FADE — rows appearing one by one
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes staggerIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+tbody tr {
+  animation: staggerIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+tbody tr:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+tbody tr:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+tbody tr:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+tbody tr:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+tbody tr:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+tbody tr:nth-child(6) {
+  animation-delay: 0.3s;
+}
+
+tbody tr:nth-child(7) {
+  animation-delay: 0.35s;
+}
+
+tbody tr:nth-child(8) {
+  animation-delay: 0.4s;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOW — chartreuse highlight on critical data
+   ═══════════════════════════════════════════════════════════════ */
+.data-glow {
+  text-shadow: 0 0 20px rgba(198, 241, 53, 0.3),
+    0 0 40px rgba(198, 241, 53, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NETWORK HASH — sliding hash animation for Web3 feel
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes hashScroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.hash-scroll {
+  animation: hashScroll 20s linear infinite;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOCUS STATES — accessibility with brutalist style
+   ═══════════════════════════════════════════════════════════════ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--chartreuse);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RANGE INPUT — brutalist slider styling
+   ═══════════════════════════════════════════════════════════════ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--surface-2);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  cursor: none !important;
+  transition: background 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--chartreuse);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  border: none;
+  cursor: none !important;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: var(--chartreuse);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LINK HOVER — underline reveal
+   ═══════════════════════════════════════════════════════════════ */
+a {
+  position: relative;
+}
+
+nav a::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--chartreuse);
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+nav a:hover::after {
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+@layer utilities {
+  .font-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .label {
+    @apply text-2xs tracking-[3px] uppercase text-ink-faint font-mono font-medium;
+  }
+
+  .panel {
+    @apply border border-border;
+  }
+
+  .panel-header {
+    @apply flex items-baseline justify-between px-7 py-5 border-b border-border;
+  }
+
+  .panel-title {
+    @apply text-[10px] tracking-[3px] uppercase font-semibold text-ink font-mono;
+  }
+
+  .btn-primary {
+    @apply w-full bg-ink text-bg border-2 border-ink px-6 py-4 text-[11px] tracking-[3px] uppercase font-semibold font-mono transition-all duration-100;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--green);
+    border-color: var(--green);
+    color: var(--chartreuse);
+  }
+
+  .risk-row {
+    @apply flex justify-between items-baseline py-3 border-b border-surface-2 text-[11px];
+  }
+
+  /* Section divider with numbered label */
+  .section-divider {
+    @apply flex items-center gap-3 mb-4;
+  }
+
+  .section-divider::after {
+    content: "";
+    @apply flex-1 h-px bg-border;
+  }
+}

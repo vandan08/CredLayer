@@ -1,0 +1,59 @@
+# Phase 3: Frontend dApp (Next.js)
+
+Building the decentralized interface for the CredLayer Protocol, adhering to the "Industrial Credit Bureau" brutalist design aesthetic.
+
+## Goal Description
+
+The frontend ensures users can seamlessly connect their wallets, view their detailed credit reports, request under-collateralized loans, and interact with the lending pool. The design language completely distances itself from standard Web3 interfaces by adopting a flat, data-dense, editorial aesthetic—like a Bloomberg terminal crossed with a print archive.
+
+## Proposed Changes
+
+### 1. Global Setup (`app/layout.tsx` & `globals.css`)
+- Install Google Fonts: `DM Serif Display` or `Playfair Display` (Headers) and `IBM Plex Mono` (Body/Data).
+- Delete Tailwind's default gradients and shadows.
+- Establish the color palette:
+  - Background: Off-white newsprint (`#F2EFE8`)
+  - Surface: Warm cream (`#E8E4DB`)
+  - Primary Ink: Near-black (`#1A1915`)
+  - Highlights: Electric Chartreuse (`#C6F135`)
+  - Accent Bands: Green (`#1B4332`), Amber (`#B45309`), Red (`#9B1C1C`)
+- Define strict UI rules: No rounded corners (`rounded-none` everywhere), sharp 2px solid borders for interactive elements.
+
+### 2. Layout & Navigation (`components/navigation/Sidebar.tsx`)
+- Implement a vertical left-side navigation.
+- No icons. Plain serif labels stacked with generous line height.
+- Active states indicated by a 3px electric chartreuse bottom border.
+
+### 3. Core Pages
+
+#### A. Dashboard / Borrower Report (`app/dashboard/page.tsx`)
+- Asymmetric 70/30 column layout using horizontal rules and large tracking numbers (`01 —`).
+- **Oversized Score Display**: Credit score rendered at massive `180px` font size anchored top-left.
+- **Risk Band Ticker**: A scrolling horizontal CSS ticker tape showing the active risk band, LTV, and Rate (e.g., `BAND A — LTV 40%`).
+- **Score Gauge**: Horizontal analog VU meter using segmented rectangular blocks lighting up based on score bands.
+- **Loan Ledger**: Double-entry ledger styling for repayment history (alternating faint rows, thin borders, mono IDs).
+
+#### B. Borrowing & Approval Flow
+- Minimal forms with full-width inputs, thick bottom borders, no outlines.
+- Calls the backend `/api/risk/loan-approval` to get the ECDSA signature, then invokes the [LendingPool.sol](file:///c:/Users/admin/Desktop/Project/Dapp%20Credit%20scoring/contracts/contracts/LendingPool.sol) contract to finalize.
+
+#### C. Lenders / Pool Health
+- Built with brutalist sparklines instead of pie charts.
+- 1px lines on faint dot grids showing pool utilization, labeled directly without tooltips.
+
+#### D. Governance (`app/governance/page.tsx`)
+- Formatted strictly like typewritten meeting minutes.
+- Serif headlines, vote fractions in mono (`1,204 / 2,000`).
+- Oversized `VOTE YEA` and `VOTE NAY` buttons with 2px solid borders.
+
+### 4. Micro-interactions
+- Page transitions are instant literal cuts with a single-frame flash of the accent color.
+- Score loading shown with a blinking cursor: `FETCHING SCORE _`
+- Mechanical counter roll-up animations for score digits (via Framer Motion or pure CSS `translateY`).
+
+## Verification Plan
+
+### Manual Verification
+- Verify the layout adheres strictly to the layout rules (asymmetric columns, no rounded corners, horizontal rule dividers).
+- Test wallet connectivity using Next.js `wagmi` / `viem` integrations.
+- Validate end-to-end borrowing flow simulating the API call and the subsequent on-chain transaction.
