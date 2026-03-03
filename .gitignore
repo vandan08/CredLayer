@@ -20,3 +20,6 @@ typechain-types
 
 /backend/.idea
 *.gitignore
+
+/frontend/.next
+.idea
