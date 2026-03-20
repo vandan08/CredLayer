@@ -258,9 +258,18 @@ export default function Dashboard() {
     <div className="p-14 max-w-[1200px]">
       {/* Connection banner */}
       {!isConnected && (
-        <div className="bg-surface border border-border px-6 py-4 mb-6 flex items-center justify-between">
-          <span className="text-[11px] font-mono text-ink-muted">
-            ⚠ Wallet not connected — showing demo data. Connect your wallet to see live on-chain data.
+        <div className="bg-surface border-l-2 border-l-amber border border-border px-6 py-4 mb-6 flex items-center gap-4">
+          <div className="w-2 h-2 bg-amber shrink-0" />
+          <span className="text-[10px] font-mono text-ink-muted tracking-[0.5px]">
+            WALLET NOT CONNECTED — Displaying demo data. Connect your wallet for live on-chain reads.
+          </span>
+        </div>
+      )}
+      {isConnected && (
+        <div className="bg-green/5 border-l-2 border-l-chartreuse border border-border px-6 py-3 mb-6 flex items-center gap-4">
+          <div className="w-2 h-2 bg-chartreuse status-dot shrink-0" />
+          <span className="text-[10px] font-mono text-green tracking-[0.5px]">
+            LIVE — Reading from CreditRegistry & LendingPool contracts
           </span>
         </div>
       )}
@@ -283,8 +292,11 @@ export default function Dashboard() {
       {/* Score + Gauge */}
       <div className="border border-border grid grid-cols-2 mb-0">
         <div className="p-12 border-r border-border relative overflow-hidden">
-          <div className="label mb-4">Credit Score</div>
-          <div className="relative z-10">
+          <div className="label mb-4">
+            Credit Score
+            {isConnected && <span className="ml-2 text-chartreuse">● LIVE</span>}
+          </div>
+          <div className={clsx("relative z-10", isConnected && "data-glow")}>
             <ScoreDigits score={score} />
           </div>
           <div className="font-serif text-[260px] font-black text-surface absolute bottom-[-60px] right-[-16px] leading-none pointer-events-none select-none z-0">

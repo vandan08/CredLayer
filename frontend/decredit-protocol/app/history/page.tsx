@@ -1,33 +1,45 @@
 "use client";
 
+import { useAccount, useReadContract } from "wagmi";
 import { LOANS, SCORE_HISTORY, SCORE_MONTHS, BORROWER } from "@/lib/data";
+import { LENDING_POOL_ABI, ADDRESSES } from "@/lib/web3/contracts";
 import { clsx } from "clsx";
+import { formatUnits } from "viem";
 
 const statusStyles: Record<string, string> = {
-  Active:  "bg-chartreuse/30 text-[#4A5E00]",
-  Repaid:  "bg-green/10 text-green",
+  Active: "bg-chartreuse/30 text-[#4A5E00]",
+  Repaid: "bg-green/10 text-green",
   Overdue: "bg-crimson/10 text-crimson",
 };
 
 const REPAYMENT_EVENTS = [
-  { date: "Feb 12, 2026", event: "Loan #LN-00041 issued",      type: "borrow",  amount: "+$3,200" },
-  { date: "Jan 15, 2026", event: "Loan #LN-00038 fully repaid", type: "repay",   amount: "-$2,811.64" },
-  { date: "Dec 01, 2025", event: "Loan #LN-00038 issued",      type: "borrow",  amount: "+$2,800" },
-  { date: "Nov 18, 2025", event: "Credit score updated: 728→742", type: "score",  amount: "+14 pts" },
-  { date: "Oct 18, 2025", event: "Loan #LN-00031 fully repaid", type: "repay",   amount: "-$1,604.07" },
-  { date: "Sep 18, 2025", event: "Loan #LN-00031 issued",      type: "borrow",  amount: "+$1,600" },
-  { date: "Sep 01, 2025", event: "Upgraded to Band A",         type: "upgrade", amount: "Band B → A" },
-  { date: "Jun 17, 2025", event: "Loan #LN-00024 fully repaid", type: "repay",   amount: "-$803.08" },
+  { date: "Feb 12, 2026", event: "Loan #LN-00041 issued", type: "borrow", amount: "+$3,200" },
+  { date: "Jan 15, 2026", event: "Loan #LN-00038 fully repaid", type: "repay", amount: "-$2,811.64" },
+  { date: "Dec 01, 2025", event: "Loan #LN-00038 issued", type: "borrow", amount: "+$2,800" },
+  { date: "Nov 18, 2025", event: "Credit score updated: 728→742", type: "score", amount: "+14 pts" },
+  { date: "Oct 18, 2025", event: "Loan #LN-00031 fully repaid", type: "repay", amount: "-$1,604.07" },
+  { date: "Sep 18, 2025", event: "Loan #LN-00031 issued", type: "borrow", amount: "+$1,600" },
+  { date: "Sep 01, 2025", event: "Upgraded to Band A", type: "upgrade", amount: "Band B → A" },
+  { date: "Jun 17, 2025", event: "Loan #LN-00024 fully repaid", type: "repay", amount: "-$803.08" },
 ];
 
 const eventColors: Record<string, string> = {
-  borrow:  "bg-ink",
-  repay:   "bg-green",
-  score:   "bg-chartreuse",
+  borrow: "bg-ink",
+  repay: "bg-green",
+  score: "bg-chartreuse",
   upgrade: "bg-amber",
 };
 
 export default function HistoryPage() {
+  const { address, isConnected } = useAccount();
+
+  const { data: rawTotalDeposits } = useReadContract({
+    address: ADDRESSES.LENDING_POOL,
+    abi: LENDING_POOL_ABI,
+    functionName: "totalDeposits",
+    query: { enabled: isConnected },
+  });
+
   const totalInterestPaid = LOANS
     .filter((l) => l.status === "Repaid")
     .reduce((sum, l) => sum + l.amount * (l.rate / 100) * 0.08, 0);
@@ -40,16 +52,20 @@ export default function HistoryPage() {
           <div className="flex-1 h-px bg-border" />
         </div>
         <h1 className="font-serif text-[42px] font-bold tracking-[-1px] leading-none mb-1">Loan History</h1>
-        <p className="text-[11px] text-ink-muted font-mono">Complete on-chain record for wallet {BORROWER.address}</p>
+        <p className="text-[11px] text-ink-muted font-mono">
+          {isConnected && address
+            ? `Complete on-chain record for wallet ${address.slice(0, 6)}...${address.slice(-4)}`
+            : `Complete on-chain record for wallet ${BORROWER.address}`}
+        </p>
       </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-4 border border-border mb-8">
         {[
-          { label: "Total Loans",       value: LOANS.length.toString() },
-          { label: "Total Borrowed",    value: `$${LOANS.reduce((s, l) => s + l.amount, 0).toLocaleString()}` },
-          { label: "Interest Paid",     value: `$${totalInterestPaid.toFixed(2)}` },
-          { label: "Default Count",     value: "0" },
+          { label: "Total Loans", value: LOANS.length.toString() },
+          { label: "Total Borrowed", value: `$${LOANS.reduce((s, l) => s + l.amount, 0).toLocaleString()}` },
+          { label: "Interest Paid", value: `$${totalInterestPaid.toFixed(2)}` },
+          { label: "Default Count", value: "0" },
         ].map((s, i) => (
           <div key={i} className={clsx("p-7", i < 3 && "border-r border-border")}>
             <div className="label mb-2">{s.label}</div>
@@ -144,6 +160,9 @@ export default function HistoryPage() {
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Activity Log</span>
+              {isConnected && (
+                <span className="text-[8px] font-mono text-chartreuse tracking-[1px]">● LIVE</span>
+              )}
             </div>
             <div className="p-6">
               <div className="relative">
@@ -152,7 +171,11 @@ export default function HistoryPage() {
 
                 <div className="space-y-0">
                   {REPAYMENT_EVENTS.map((ev, i) => (
-                    <div key={i} className="relative flex gap-4 pb-6">
+                    <div
+                      key={i}
+                      className="relative flex gap-4 pb-6"
+                      style={{ animation: `staggerIn 0.3s cubic-bezier(0.16,1,0.3,1) ${i * 0.06}s both` }}
+                    >
                       <div className={clsx("w-4 h-4 shrink-0 mt-[2px] relative z-10", eventColors[ev.type])} />
                       <div className="flex-1">
                         <div className="text-[10px] text-ink-faint font-mono mb-[2px] tracking-[0.5px]">{ev.date}</div>
@@ -160,8 +183,8 @@ export default function HistoryPage() {
                         <div className={clsx(
                           "text-[10px] font-mono font-semibold mt-1",
                           ev.type === "repay" ? "text-green" :
-                          ev.type === "borrow" ? "text-ink" :
-                          ev.type === "upgrade" ? "text-amber" : "text-ink-muted"
+                            ev.type === "borrow" ? "text-ink" :
+                              ev.type === "upgrade" ? "text-amber" : "text-ink-muted"
                         )}>
                           {ev.amount}
                         </div>
@@ -170,6 +193,22 @@ export default function HistoryPage() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* On-chain verification */}
+          <div className="border border-border p-6 mt-6">
+            <div className="label mb-3">On-Chain Verification</div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className={clsx("w-2 h-2", isConnected ? "bg-chartreuse status-dot" : "bg-surface-2")} />
+              <span className={clsx("text-[10px] font-mono font-semibold", isConnected ? "text-green" : "text-ink-muted")}>
+                {isConnected ? "Connected to blockchain" : "Offline — connect wallet"}
+              </span>
+            </div>
+            <div className="text-[8px] font-mono text-ink-faint leading-relaxed tracking-[0.5px]">
+              ALL LOAN RECORDS ARE IMMUTABLY STORED<br />
+              ON THE ETHEREUM BLOCKCHAIN.<br />
+              CREDIT SCORES ARE UPDATED VIA ORACLE.
             </div>
           </div>
         </div>

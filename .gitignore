@@ -21,5 +21,13 @@ typechain-types
 /backend/.idea
 *.gitignore
 
-/frontend/.next
+.next/
+node_modules/
+out/
+dist/
+coverage/
+
 .idea
+/frontend/decredit-protocol/.eslintrc.json
+/backend/target/
+.gitignore
