@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CustomCursor />
           <div className="flex min-h-screen">
             <Sidebar />
-            <main className="ml-[220px] flex-1 flex flex-col">
+            <main className="ml-[220px] flex-1 flex flex-col overflow-x-hidden max-w-[calc(100vw-220px)]">
               <Ticker />
               <div className="flex-1">{children}</div>
             </main>
