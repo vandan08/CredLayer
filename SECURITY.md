@@ -234,6 +234,12 @@ These are deliberate, not overlooked. Each is blocking for a mainnet deployment:
    wallet and start fresh at the 500 default. Real mitigation needs identity
    attestation — the fundamental open problem in under-collateralized DeFi lending.
 8. **`MockUSDC` has a public faucet** and must never be deployed to mainnet.
+9. **Band D collateral ratio diverges between layers.** `CollateralVault.COLLATERAL_RATIO_D`
+   is `11000` (110%), while `RiskModelService.calculateTerms()` signs Band D approvals at
+   150%. This is *fail-safe* — the contract check is `collateral >= required`, so the
+   stricter backend figure always passes — and the frontend quotes 150% because that is
+   what a borrower actually posts. It is still two sources of truth for one number and
+   should be reconciled to a single constant before mainnet.
 
 ---
 
