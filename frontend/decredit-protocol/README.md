@@ -1,6 +1,24 @@
-# DeCredit Protocol — Frontend (Phase 3)
+# CredLayer — Frontend (Phase 3)
 
-Next.js 14 frontend for the Decentralized Credit Scoring & Under-Collateralized Lending Protocol.
+Next.js 14 frontend for the CredLayer decentralized credit scoring & under-collateralized lending protocol.
+
+## Routes
+
+| Route | Group | Notes |
+|---|---|---|
+| `/` | — | Marketing landing page. Full-bleed, no sidebar, no wallet required. Includes the interactive risk-engine simulator. |
+| `/dashboard`, `/borrow`, `/lend`, `/history`, `/governance` | `(app)` | The protocol app. Shares the sidebar + ticker chrome via `app/(app)/layout.tsx`. |
+
+Every app page falls back to seeded demo data from `lib/data.ts` when no wallet is
+connected, so the whole product is explorable without MetaMask or testnet funds.
+
+## Risk constants
+
+`lib/risk.ts` is the single source of truth for score thresholds, collateral
+ratios, interest rates and loan ceilings. It mirrors `CreditRegistry.sol`,
+`CollateralVault.sol` and the backend `RiskModelService`. Do not redeclare these
+numbers anywhere else — `lib/data.ts`, the borrow page, the ticker and the
+landing page all derive from it.
 
 ## Design Philosophy
 
