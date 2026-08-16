@@ -3,9 +3,9 @@ spring:
     name: credlayer-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/credlayer_db
-    username: credlayer
-    password: credpassword
+    url: "${CREDLAYER_DB_URL:jdbc:postgresql://localhost:5432/credlayer_db}"
+    username: "${CREDLAYER_DB_USER:credlayer}"
+    password: "${CREDLAYER_DB_PASSWORD:credpassword}"
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -16,17 +16,27 @@ spring:
       hibernate:
         format_sql: true
 
-# Web3j Configuration
+# Web3j Configuration — point at your RPC node (Hardhat locally, Alchemy/Infura for testnet)
 web3j:
-  client-address: http://127.0.0.1:8545
+  client-address: "${CREDLAYER_RPC_URL:http://127.0.0.1:8545}"
 
 # CredLayer Settings
 credlayer:
   contracts:
-    credit-registry: ""       # To be filled after deployment
-    lending-pool: ""          # To be filled after deployment
+    # Deterministic local Hardhat addresses produced by `scripts/deploy.js` on a
+    # fresh node. Override via env (CREDLAYER_CONTRACTS_CREDIT-REGISTRY, ...) for
+    # other networks, or leave blank to disable on-chain oracle/listener wiring.
+    credit-registry: "${CREDLAYER_CREDIT_REGISTRY:0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}"
+    lending-pool: "${CREDLAYER_LENDING_POOL:0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}"
   oracle:
-    private-key: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # Default Hardhat Account #0
+    # Default Hardhat Account #0 — also the deploy script's deployer, so it is the
+    # CreditRegistry oracle and the LendingPool approvalSigner.
+    # ⚠ PRODUCTION: this default is a publicly-known key. ALWAYS override
+    #   CREDLAYER_ORACLE_KEY with a dedicated, funded key on real networks.
+    private-key: "${CREDLAYER_ORACLE_KEY:0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
+  security:
+    # Comma-separated list of origins allowed to call /api/** (the frontend URL).
+    allowed-origins: "${CREDLAYER_ALLOWED_ORIGINS:http://localhost:3000}"
 
 server:
-  port: 8080
+  port: "${PORT:8080}"
