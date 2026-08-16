@@ -79,11 +79,14 @@ public class BlockchainListenerService {
             Long loanId = ((Uint256) indexed.get(0)).getValue().longValue();
             String borrower = ((Address) indexed.get(1)).getValue();
 
+            // Non-indexed order: amount, interestRate, collateralAmount, dueDate
             String amount = ((Uint256) nonIndexed.get(0)).getValue().toString();
             int interestRate = ((Uint256) nonIndexed.get(1)).getValue().intValue();
 
-            // dueDate is strictly BigInt / long
+            // dueDate is an absolute unix timestamp (block.timestamp + duration).
             long dueTimestamp = ((Uint256) nonIndexed.get(3)).getValue().longValue();
+            LocalDateTime dueDate = LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochSecond(dueTimestamp), java.time.ZoneId.systemDefault());
 
             Loan loan = new Loan(
                     loanId,
@@ -91,8 +94,7 @@ public class BlockchainListenerService {
                     amount,
                     interestRate,
                     0, // Active
-                    LocalDateTime.now().plusSeconds(dueTimestamp) // Simplified for now
-            );
+                    dueDate);
 
             loanRepository.save(loan);
             log.info("Saved new loan: {}", loanId);

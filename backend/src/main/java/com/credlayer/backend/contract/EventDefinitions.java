@@ -39,18 +39,16 @@ public class EventDefinitions {
                     } // amount
             ));
 
-    // event LoanLiquidated(uint256 indexed loanId, address indexed borrower,
-    // address indexed liquidator, uint256 collateralLiquidated);
-    public static final Event LOAN_LIQUIDATED_EVENT = new Event("LoanLiquidated",
+    // event Liquidated(uint256 indexed loanId, address indexed borrower, uint256
+    // collateralSeized);
+    public static final Event LOAN_LIQUIDATED_EVENT = new Event("Liquidated",
             Arrays.asList(
                     new TypeReference<Uint256>(true) {
                     }, // indexed loanId
                     new TypeReference<Address>(true) {
                     }, // indexed borrower
-                    new TypeReference<Address>(true) {
-                    }, // indexed liquidator
                     new TypeReference<Uint256>() {
-                    } // collateralLiquidated
+                    } // collateralSeized
             ));
 
     // event CreditScoreUpdated(address indexed borrower, uint256 oldScore, uint256
