@@ -19,6 +19,11 @@ class SignatureServiceTest {
     private final String testPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
     private final String testAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
+    // Canonical loan parameters (USDC has 6 decimals): 5,000 USDC, 30 days, 2,000 collateral.
+    private final BigInteger amount = new BigInteger("5000000000"); // 5,000e6
+    private final BigInteger duration = BigInteger.valueOf(30L * 24 * 60 * 60);
+    private final BigInteger collateral = new BigInteger("2000000000"); // 2,000e6
+
     @BeforeEach
     void setUp() {
         signatureService = new SignatureService();
@@ -27,15 +32,9 @@ class SignatureServiceTest {
 
     @Test
     void testSignLoanApproval_GeneratesValidSignature() {
-        String borrower = testAddress;
-        BigInteger amount = new BigInteger("1000000000000000000000");
-        int interestRate = 5;
-        int collateralPercent = 40;
         long deadline = System.currentTimeMillis() / 1000 + 3600;
 
-        String signature = signatureService.signLoanApproval(
-            borrower, amount, interestRate, collateralPercent, deadline
-        );
+        String signature = signatureService.signLoanApproval(testAddress, amount, duration, collateral, deadline);
 
         assertNotNull(signature);
         assertTrue(signature.startsWith("0x"));
@@ -44,54 +43,37 @@ class SignatureServiceTest {
 
     @Test
     void testSignLoanApproval_DifferentInputsProduceDifferentSignatures() {
-        String borrower = testAddress;
-        BigInteger amount1 = new BigInteger("1000000000000000000000");
-        BigInteger amount2 = new BigInteger("2000000000000000000000");
         long deadline = System.currentTimeMillis() / 1000 + 3600;
 
-        String sig1 = signatureService.signLoanApproval(borrower, amount1, 5, 40, deadline);
-        String sig2 = signatureService.signLoanApproval(borrower, amount2, 5, 40, deadline);
+        String sig1 = signatureService.signLoanApproval(testAddress, amount, duration, collateral, deadline);
+        String sig2 = signatureService.signLoanApproval(testAddress, amount.add(BigInteger.ONE), duration, collateral,
+                deadline);
 
         assertNotEquals(sig1, sig2);
     }
 
     @Test
     void testSignLoanApproval_SameInputsProduceSameSignature() {
-        String borrower = testAddress;
-        BigInteger amount = new BigInteger("1000000000000000000000");
-        int interestRate = 5;
-        int collateralPercent = 40;
         long deadline = 1234567890L;
 
-        String sig1 = signatureService.signLoanApproval(borrower, amount, interestRate, collateralPercent, deadline);
-        String sig2 = signatureService.signLoanApproval(borrower, amount, interestRate, collateralPercent, deadline);
+        String sig1 = signatureService.signLoanApproval(testAddress, amount, duration, collateral, deadline);
+        String sig2 = signatureService.signLoanApproval(testAddress, amount, duration, collateral, deadline);
 
         assertEquals(sig1, sig2);
     }
 
+    /**
+     * The recovered signer must be the oracle account, and the hash must be built
+     * exactly as Solidity's {@code keccak256(abi.encodePacked(address, uint256 x4))}.
+     */
     @Test
-    void testSignLoanApproval_SignatureCanBeRecovered() throws Exception {
-        String borrower = testAddress;
-        BigInteger amount = new BigInteger("1000000000000000000000");
-        int interestRate = 5;
-        int collateralPercent = 40;
+    void testSignLoanApproval_SignatureRecoversToOracle() throws Exception {
         long deadline = System.currentTimeMillis() / 1000 + 3600;
 
-        String signature = signatureService.signLoanApproval(
-            borrower, amount, interestRate, collateralPercent, deadline
-        );
+        String signature = signatureService.signLoanApproval(testAddress, amount, duration, collateral, deadline);
 
-        // Reconstruct the message hash
-        byte[] addressBytes = Numeric.hexStringToByteArray(Numeric.cleanHexPrefix(borrower));
-        ByteBuffer buffer = ByteBuffer.allocate(20 + 32 + 32 + 32 + 32);
-        buffer.put(addressBytes);
-        buffer.put(padLeft(amount.toByteArray(), 32));
-        buffer.put(padLeft(BigInteger.valueOf(interestRate).toByteArray(), 32));
-        buffer.put(padLeft(BigInteger.valueOf(collateralPercent).toByteArray(), 32));
-        buffer.put(padLeft(BigInteger.valueOf(deadline).toByteArray(), 32));
-        byte[] hash = Hash.sha3(buffer.array());
+        byte[] hash = packedHash(testAddress, amount, duration, collateral, deadline);
 
-        // Parse signature
         byte[] sigBytes = Numeric.hexStringToByteArray(signature);
         byte[] r = new byte[32];
         byte[] s = new byte[32];
@@ -100,8 +82,6 @@ class SignatureServiceTest {
         byte v = sigBytes[64];
 
         Sign.SignatureData signatureData = new Sign.SignatureData(v, r, s);
-
-        // Recover signer
         BigInteger publicKey = Sign.signedPrefixedMessageToKey(hash, signatureData);
         String recoveredAddress = "0x" + org.web3j.crypto.Keys.getAddress(publicKey);
 
@@ -110,59 +90,42 @@ class SignatureServiceTest {
     }
 
     @Test
-    void testSignLoanApproval_WithZeroValues() {
-        String signature = signatureService.signLoanApproval(
-            testAddress, BigInteger.ZERO, 0, 0, 0L
-        );
-
-        assertNotNull(signature);
-        assertTrue(signature.startsWith("0x"));
-        assertEquals(132, signature.length());
-    }
-
-    @Test
-    void testSignLoanApproval_WithLargeValues() {
-        BigInteger largeAmount = new BigInteger("999999999999999999999999");
-        long farFutureDeadline = Long.MAX_VALUE / 1000;
-
-        String signature = signatureService.signLoanApproval(
-            testAddress, largeAmount, 100, 200, farFutureDeadline
-        );
-
-        assertNotNull(signature);
-        assertTrue(signature.startsWith("0x"));
+    void testSignLoanApproval_RejectsMalformedAddress() {
+        long deadline = 1234567890L;
+        assertThrows(IllegalArgumentException.class,
+                () -> signatureService.signLoanApproval("0x1234", amount, duration, collateral, deadline));
     }
 
     @Test
     void testSignLoanApproval_DifferentBorrowerAddresses() {
         String borrower1 = "0x1111111111111111111111111111111111111111";
         String borrower2 = "0x2222222222222222222222222222222222222222";
-        BigInteger amount = new BigInteger("1000");
         long deadline = 1234567890L;
 
-        String sig1 = signatureService.signLoanApproval(borrower1, amount, 5, 40, deadline);
-        String sig2 = signatureService.signLoanApproval(borrower2, amount, 5, 40, deadline);
+        String sig1 = signatureService.signLoanApproval(borrower1, amount, duration, collateral, deadline);
+        String sig2 = signatureService.signLoanApproval(borrower2, amount, duration, collateral, deadline);
 
         assertNotEquals(sig1, sig2);
     }
 
     @Test
     void testSignLoanApproval_DifferentDeadlines() {
-        String borrower = testAddress;
-        BigInteger amount = new BigInteger("1000");
-        long deadline1 = 1000000000L;
-        long deadline2 = 2000000000L;
-
-        String sig1 = signatureService.signLoanApproval(borrower, amount, 5, 40, deadline1);
-        String sig2 = signatureService.signLoanApproval(borrower, amount, 5, 40, deadline2);
+        String sig1 = signatureService.signLoanApproval(testAddress, amount, duration, collateral, 1000000000L);
+        String sig2 = signatureService.signLoanApproval(testAddress, amount, duration, collateral, 2000000000L);
 
         assertNotEquals(sig1, sig2);
     }
 
-    private byte[] padLeft(byte[] input, int length) {
-        byte[] padded = new byte[length];
-        int startPos = length - input.length;
-        System.arraycopy(input, 0, padded, startPos > 0 ? startPos : 0, Math.min(input.length, length));
-        return padded;
+    /** Reproduce Solidity abi.encodePacked(address, uint256, uint256, uint256, uint256) then keccak256. */
+    private static byte[] packedHash(String borrower, BigInteger amount, BigInteger duration, BigInteger collateral,
+            long deadline) {
+        byte[] addressBytes = Numeric.hexStringToByteArray(Numeric.cleanHexPrefix(borrower));
+        ByteBuffer buffer = ByteBuffer.allocate(20 + 32 + 32 + 32 + 32);
+        buffer.put(addressBytes);
+        buffer.put(Numeric.toBytesPadded(amount, 32));
+        buffer.put(Numeric.toBytesPadded(duration, 32));
+        buffer.put(Numeric.toBytesPadded(collateral, 32));
+        buffer.put(Numeric.toBytesPadded(BigInteger.valueOf(deadline), 32));
+        return Hash.sha3(buffer.array());
     }
 }

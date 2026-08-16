@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
 import org.web3j.crypto.Sign;
-import org.web3j.crypto.StructuredDataEncoder;
 import org.web3j.utils.Numeric;
 
 import java.math.BigInteger;
@@ -19,27 +18,45 @@ public class SignatureService {
     @Value("${credlayer.oracle.private-key}")
     private String privateKeyHex;
 
-    public String signLoanApproval(String borrower, BigInteger amount, int interestRate, int collateralPercent,
-            long deadline) {
+    /**
+     * Produce a backend ("oracle") signature over the exact tuple the LendingPool
+     * contract verifies:
+     *
+     * <pre>
+     *   keccak256(abi.encodePacked(borrower, amount, duration, collateralAmount, deadline))
+     * </pre>
+     *
+     * then signed as an EIP-191 personal_sign message (Ethereum prefix). All four
+     * numeric fields are {@code uint256} and must match, byte-for-byte, the values
+     * the borrower later passes to {@code LendingPool.borrow(...)}.
+     *
+     * @param borrower         borrower wallet address (0x-prefixed, 20 bytes)
+     * @param amount           loan amount in token base units (USDC: 6 decimals)
+     * @param duration         loan duration in seconds
+     * @param collateralAmount collateral amount in token base units
+     * @param deadline         signature expiry as a unix timestamp (seconds)
+     */
+    public String signLoanApproval(String borrower, BigInteger amount, BigInteger duration,
+            BigInteger collateralAmount, long deadline) {
         Credentials credentials = Credentials.create(privateKeyHex);
 
-        // Match Solidity: keccak256(abi.encodePacked(borrower, amount, duration, collateralAmount, deadline))
-        // Note: Solidity expects duration (uint256), not interestRate
+        // abi.encodePacked packs an address as 20 bytes and each uint256 as 32 bytes.
         byte[] addressBytes = Numeric.hexStringToByteArray(Numeric.cleanHexPrefix(borrower));
+        if (addressBytes.length != 20) {
+            throw new IllegalArgumentException("Invalid borrower address: " + borrower);
+        }
 
-        // For abi.encodePacked, we need to match exact Solidity types
-        // The contract expects: (address, uint256, uint256, uint256, uint256)
         ByteBuffer buffer = ByteBuffer.allocate(20 + 32 + 32 + 32 + 32);
-
-        buffer.put(addressBytes); // address (20 bytes)
-        buffer.put(padLeft(amount.toByteArray(), 32)); // amount (uint256)
-        buffer.put(padLeft(BigInteger.valueOf(interestRate).toByteArray(), 32)); // duration (uint256)
-        buffer.put(padLeft(BigInteger.valueOf(collateralPercent).toByteArray(), 32)); // collateralAmount (uint256)
-        buffer.put(padLeft(BigInteger.valueOf(deadline).toByteArray(), 32)); // deadline (uint256)
+        buffer.put(addressBytes); // address   (20 bytes)
+        buffer.put(Numeric.toBytesPadded(amount, 32)); // amount           (uint256)
+        buffer.put(Numeric.toBytesPadded(duration, 32)); // duration         (uint256)
+        buffer.put(Numeric.toBytesPadded(collateralAmount, 32)); // collateralAmount (uint256)
+        buffer.put(Numeric.toBytesPadded(BigInteger.valueOf(deadline), 32)); // deadline (uint256)
 
         byte[] hash = Hash.sha3(buffer.array());
 
-        // Sign with Ethereum prefix
+        // Sign with the Ethereum "\x19Ethereum Signed Message:\n32" prefix so it matches
+        // Solidity's MessageHashUtils.toEthSignedMessageHash / ecrecover flow.
         Sign.SignatureData signatureData = Sign.signPrefixedMessage(hash, credentials.getEcKeyPair());
 
         byte[] sigBytes = new byte[65];
@@ -49,12 +66,5 @@ public class SignatureService {
 
         log.debug("Signed loan approval for {} with hash: {}", borrower, Numeric.toHexString(hash));
         return Numeric.toHexString(sigBytes);
-    }
-
-    private byte[] padLeft(byte[] input, int length) {
-        byte[] padded = new byte[length];
-        int startPos = length - input.length;
-        System.arraycopy(input, 0, padded, startPos > 0 ? startPos : 0, Math.min(input.length, length));
-        return padded;
     }
 }

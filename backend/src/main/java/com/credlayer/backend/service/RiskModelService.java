@@ -65,12 +65,17 @@ public class RiskModelService {
         private LoanTerms terms;
         private long deadline;
         private BigInteger amountRequested;
+        private BigInteger duration;
+        private BigInteger collateralAmount;
         private String signature;
 
-        public SignedLoanApproval(LoanTerms terms, long deadline, BigInteger amountRequested, String signature) {
+        public SignedLoanApproval(LoanTerms terms, long deadline, BigInteger amountRequested, BigInteger duration,
+                BigInteger collateralAmount, String signature) {
             this.terms = terms;
             this.deadline = deadline;
             this.amountRequested = amountRequested;
+            this.duration = duration;
+            this.collateralAmount = collateralAmount;
             this.signature = signature;
         }
 
@@ -84,6 +89,14 @@ public class RiskModelService {
 
         public BigInteger getAmountRequested() {
             return amountRequested;
+        }
+
+        public BigInteger getDuration() {
+            return duration;
+        }
+
+        public BigInteger getCollateralAmount() {
+            return collateralAmount;
         }
 
         public String getSignature() {
@@ -102,20 +115,22 @@ public class RiskModelService {
         int interestRate;
         int requiredCollateral;
 
+        // Amounts are denominated in USDC base units (6 decimals), matching MockUSDC
+        // and the on-chain LendingPool / CollateralVault accounting.
         if (score >= 800) { // Band A
-            maxLoan = new BigInteger("10000000000000000000000"); // 10,000 USDC
+            maxLoan = usdc(10_000); // 10,000 USDC
             interestRate = 5; // 5%
             requiredCollateral = 40; // 40% collateral
         } else if (score >= 600) { // Band B
-            maxLoan = new BigInteger("5000000000000000000000"); // 5,000 USDC
+            maxLoan = usdc(5_000); // 5,000 USDC
             interestRate = 8; // 8%
             requiredCollateral = 70; // 70% collateral
         } else if (score >= 400) { // Band C
-            maxLoan = new BigInteger("1000000000000000000000"); // 1,000 USDC
+            maxLoan = usdc(1_000); // 1,000 USDC
             interestRate = 12; // 12%
             requiredCollateral = 110; // 110% collateral (Over-collateralized)
         } else { // Band D
-            maxLoan = new BigInteger("50000000000000000000"); // 50 USDC
+            maxLoan = usdc(50); // 50 USDC
             interestRate = 20; // 20%
             requiredCollateral = 150; // 150% collateral
         }
@@ -129,12 +144,39 @@ public class RiskModelService {
                 score);
     }
 
-    public SignedLoanApproval generateLoanApproval(String borrowerAddress, BigInteger amountRequested) {
+    /**
+     * Assess a loan request against the borrower's risk band and return a
+     * backend-signed approval the borrower can submit to {@code LendingPool.borrow}.
+     *
+     * <p>The signature commits to the exact {@code collateralAmount} and
+     * {@code duration} returned here, so the frontend must forward these values
+     * unchanged. The collateral is derived from the band's required LTV
+     * ({@code amount * requiredCollateralPercent / 100}).
+     *
+     * @param borrowerAddress borrower wallet address
+     * @param amountRequested requested loan amount in USDC base units (6 decimals)
+     * @param durationSeconds requested loan duration in seconds
+     */
+    public SignedLoanApproval generateLoanApproval(String borrowerAddress, BigInteger amountRequested,
+            BigInteger durationSeconds) {
         LoanTerms terms = calculateTerms(borrowerAddress);
 
+        if (amountRequested == null || amountRequested.signum() <= 0) {
+            throw new IllegalArgumentException("Requested amount must be greater than zero.");
+        }
         if (amountRequested.compareTo(terms.getMaxLoanAmount()) > 0) {
             throw new IllegalArgumentException("Requested amount exceeds risk limit for this borrower.");
         }
+        if (durationSeconds == null || durationSeconds.signum() <= 0) {
+            throw new IllegalArgumentException("Loan duration must be greater than zero.");
+        }
+
+        // Collateral required = amount * requiredCollateralPercent / 100, rounded up so
+        // it always satisfies the contract's `collateralAmount >= requiredCollateral` check.
+        BigInteger[] divMod = amountRequested
+                .multiply(BigInteger.valueOf(terms.getRequiredCollateralPercent()))
+                .divideAndRemainder(BigInteger.valueOf(100));
+        BigInteger collateralAmount = divMod[1].signum() == 0 ? divMod[0] : divMod[0].add(BigInteger.ONE);
 
         // Validity: 1 hour from now
         long deadline = LocalDateTime.now().plusHours(1).atZone(java.time.ZoneId.systemDefault()).toEpochSecond();
@@ -142,14 +184,21 @@ public class RiskModelService {
         String signature = signatureService.signLoanApproval(
                 borrowerAddress,
                 amountRequested,
-                terms.getInterestRate(),
-                terms.getRequiredCollateralPercent(),
+                durationSeconds,
+                collateralAmount,
                 deadline);
 
         return new SignedLoanApproval(
                 terms,
                 deadline,
                 amountRequested,
+                durationSeconds,
+                collateralAmount,
                 signature);
+    }
+
+    /** Convert a whole-USDC amount to base units (6 decimals). */
+    private static BigInteger usdc(long whole) {
+        return BigInteger.valueOf(whole).multiply(BigInteger.valueOf(1_000_000L));
     }
 }
