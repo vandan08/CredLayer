@@ -1,10 +1,9 @@
 "use client";
 
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount } from "wagmi";
 import { LOANS, SCORE_HISTORY, SCORE_MONTHS, BORROWER } from "@/lib/data";
-import { LENDING_POOL_ABI, ADDRESSES } from "@/lib/web3/contracts";
+import { ActiveLoans } from "@/components/loans/ActiveLoans";
 import { clsx } from "clsx";
-import { formatUnits } from "viem";
 
 const statusStyles: Record<string, string> = {
   Active: "bg-chartreuse/30 text-[#4A5E00]",
@@ -33,25 +32,18 @@ const eventColors: Record<string, string> = {
 export default function HistoryPage() {
   const { address, isConnected } = useAccount();
 
-  const { data: rawTotalDeposits } = useReadContract({
-    address: ADDRESSES.LENDING_POOL,
-    abi: LENDING_POOL_ABI,
-    functionName: "totalDeposits",
-    query: { enabled: isConnected },
-  });
-
   const totalInterestPaid = LOANS
     .filter((l) => l.status === "Repaid")
     .reduce((sum, l) => sum + l.amount * (l.rate / 100) * 0.08, 0);
 
   return (
-    <div className="p-14 max-w-[1100px]">
+    <div className="p-6 md:p-10 lg:p-14 max-w-[1100px]">
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">01 — Record</span>
           <div className="flex-1 h-px bg-border" />
         </div>
-        <h1 className="font-serif text-[42px] font-bold tracking-[-1px] leading-none mb-1">Loan History</h1>
+        <h1 className="font-serif text-[32px] md:text-[42px] font-bold tracking-[-1px] leading-none mb-1">Loan History</h1>
         <p className="text-[11px] text-ink-muted font-mono">
           {isConnected && address
             ? `Complete on-chain record for wallet ${address.slice(0, 6)}...${address.slice(-4)}`
@@ -60,25 +52,31 @@ export default function HistoryPage() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-4 border border-border mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 border border-border mb-8">
         {[
           { label: "Total Loans", value: LOANS.length.toString() },
           { label: "Total Borrowed", value: `$${LOANS.reduce((s, l) => s + l.amount, 0).toLocaleString()}` },
           { label: "Interest Paid", value: `$${totalInterestPaid.toFixed(2)}` },
           { label: "Default Count", value: "0" },
         ].map((s, i) => (
-          <div key={i} className={clsx("p-7", i < 3 && "border-r border-border")}>
+          <div key={i} className={clsx("p-7 border-border", i % 2 === 0 && "border-r", i < 3 && "lg:border-r", i < 2 && "border-b lg:border-b-0")}>
             <div className="label mb-2">{s.label}</div>
             <div className="font-serif text-[28px] font-bold tracking-[-1px]">{s.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-[3fr_2fr] gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-8">
         {/* Full ledger */}
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">02 — All Loans</span>
+            <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">02 — Active Loans</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <ActiveLoans />
+
+          <div className="flex items-center gap-3 mb-4 mt-6">
+            <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">03 — Demo Ledger</span>
             <div className="flex-1 h-px bg-border" />
           </div>
           <div className="panel">
@@ -86,8 +84,8 @@ export default function HistoryPage() {
               <span className="panel-title">Loan Ledger</span>
               <span className="text-[9px] text-ink-faint font-mono">{LOANS.length} records</span>
             </div>
-            <div className="px-7 pb-4">
-              <table className="w-full text-[11px] font-mono border-collapse">
+            <div className="px-7 pb-4 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-[11px] font-mono border-collapse">
                 <thead>
                   <tr className="border-b-2 border-ink">
                     {["ID", "Amount", "Duration", "Rate", "Issued", "Status"].map((h) => (
@@ -123,8 +121,8 @@ export default function HistoryPage() {
               <span className="panel-title">Score Progression</span>
               <span className="text-[9px] text-ink-faint font-mono">12-month trend</span>
             </div>
-            <div className="px-7 pb-4">
-              <table className="w-full text-[11px] font-mono border-collapse">
+            <div className="px-7 pb-4 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-[11px] font-mono border-collapse">
                 <thead>
                   <tr className="border-b-2 border-ink">
                     <th className="text-[9px] tracking-[2px] uppercase text-ink-faint font-semibold text-left py-3">Month</th>
