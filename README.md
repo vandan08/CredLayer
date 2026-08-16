@@ -1,15 +1,24 @@
-# Decentralized Credit Scoring & Under-Collateralized Lending Protocol
+# CredLayer — Decentralized Credit Scoring & Under-Collateralized Lending
 
-A comprehensive blockchain-based lending platform that revolutionizes DeFi by introducing reputation-based, under-collateralized loans. The protocol integrates an off-chain risk engine with on-chain smart contracts to dynamically adjust collateral requirements based on a user's credit score.
+[![CI](https://github.com/vandan08/CredLayer/actions/workflows/ci.yml/badge.svg)](https://github.com/vandan08/CredLayer/actions/workflows/ci.yml)
+[![Security](https://github.com/vandan08/CredLayer/actions/workflows/security.yml/badge.svg)](https://github.com/vandan08/CredLayer/actions/workflows/security.yml)
+[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](#-testing)
+[![Solidity](https://img.shields.io/badge/solidity-0.8.24-363636)](contracts/contracts)
+[![License](https://img.shields.io/badge/license-MIT-blue)](#)
+
+A blockchain-based lending platform that enables reputation-based, **under-collateralized** loans. An off-chain risk engine cryptographically co-signs every loan, letting on-chain contracts safely lend at collateral ratios that pure on-chain protocols cannot offer.
 
 ## 🌟 Project Overview
 
-Traditional DeFi lending requires significant over-collateralization (often 150%+). This protocol enables under-collateralized borrowing (down to 40% LTV) by utilizing an off-chain risk scoring engine. Borrowers with high credit scores and good repayment histories are rewarded with lower collateral requirements and better interest rates.
+Traditional DeFi lending requires significant over-collateralization (often 150%+). CredLayer enables under-collateralized borrowing (down to 40% LTV) using an off-chain risk scoring engine. Borrowers with high credit scores and good repayment histories are rewarded with lower collateral requirements and better interest rates.
 
 ### The System Consists of Three Main Layers:
-1. **Smart Contracts (Phase 1 - Completed)**: Core protocol logic (Solidity, Hardhat).
-2. **Backend Risk Engine (Phase 2 - Completed)**: Java Spring Boot application to analyze off-chain data, assess risk, and push credit scores on-chain.
-3. **Frontend dApp (Phase 3 - Upcoming)**: Next.js application for users to borrow, lend, and manage proposals.
+1. **Smart Contracts** ✅ — Core protocol logic (Solidity 0.8.24, Hardhat). 78 tests.
+2. **Backend Risk Engine** ✅ — Java Spring Boot service that scores borrowers, signs loan approvals, and acts as the on-chain oracle. 41 tests.
+3. **Frontend dApp** ✅ — Next.js 14 + wagmi/viem. Live on-chain borrow, repay, lend, and DAO voting flows.
+
+📄 **[SECURITY.md](SECURITY.md)** — threat model, trust assumptions, and static-analysis triage
+🚀 **[DEPLOYMENT.md](DEPLOYMENT.md)** — step-by-step Sepolia + Render + Vercel deployment
 
 ## 🏗️ Phase 1: Smart Contracts Architecture
 
@@ -56,21 +65,49 @@ npx hardhat compile
 npx hardhat test
 ```
 
+Deploy locally (seeds pool liquidity, a registered borrower, and a demo proposal, then writes contract addresses into the frontend):
+
+```bash
+npx hardhat node          # terminal 1
+npx hardhat run scripts/deploy.js --network localhost
+```
+
 ### Backend (Java Spring Boot)
-Navigate to the `backend` directory. Ensure you have Docker running for PostgreSQL and update `application.yml` with your Hardhat node connection if testing locally.
+Ensure Docker is running for PostgreSQL. Defaults target a local Hardhat node; every value is env-overridable (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 ```bash
 cd backend
-docker-compose up -d
-./mvnw clean spring-boot:run
+docker compose up -d
+mvn spring-boot:run
+```
+
+### Frontend (Next.js)
+```bash
+cd frontend/decredit-protocol
+npm install
+npm run dev
+```
+
+## 🧪 Testing
+
+```bash
+cd contracts && npx hardhat test     # 78 passing
+cd backend   && mvn test             # 41 passing
 ```
 
 ## 🔐 Security Features
 
-- **Access Controls**: `Ownable` is heavily utilized. Only authorized Oracles can update credit scores.
-- **Pausability**: Core functions are equipped with `Pausable` to quickly halt the protocol in emergencies.
-- **Reentrancy Protection**: `ReentrancyGuard` from OpenZeppelin is applied to all sensitive state-mutating functions (borrow, repay, liquidate, deposit).
-- **Backend Signatures**: Borrowing requires an off-chain ECDSA signature signed by a trusted backend key, preventing unauthorized or un-scored loans.
+Full threat model, trust assumptions, and Slither triage in **[SECURITY.md](SECURITY.md)**.
 
-## 🧑‍💻 Next Steps
-- Implementation of the Next.js Frontend (Phase 3) focusing on an "Industrial Credit Bureau" aesthetic.
-- End-to-end integration mapping frontend interactions through the backend and down to the smart contracts.
+- **Signed loan approvals**: Borrowing requires an ECDSA signature over `(borrower, amount, duration, collateral, deadline)` from the risk engine — preventing unauthorized or un-scored loans.
+- **Replay protection**: Each approval is **single-use** on-chain (`usedApprovals`) and expires after 1 hour, so one risk assessment can never fund multiple loans.
+- **Share-based lender accounting**: ERC-4626-style shares mean interest and liquidation losses accrue pro-rata, with an OpenZeppelin-style virtual offset defeating vault inflation attacks.
+- **Access controls**: Only the authorized oracle can update credit scores; only the pool can move collateral. All admin actions emit events for off-chain monitoring.
+- **Pausability & reentrancy protection**: `Pausable` emergency stop plus `ReentrancyGuard` on every state-mutating function.
+- **Automated in CI**: Slither static analysis, dependency CVE scanning, and full-history secret scanning run on every push.
+
+> ⚠️ This is a testnet portfolio project. It has **not** been professionally audited — see [SECURITY.md §6](SECURITY.md) for known limitations.
+
+## 🧑‍💻 Roadmap
+- Chainlink price feeds + multi-collateral support (ETH, WBTC) with value-based liquidation.
+- Richer credit model (repayment streak, loan size, account age) replacing the flat ±10/−150 heuristic.
+- Token- or reputation-weighted governance to replace 1-address-1-vote.
