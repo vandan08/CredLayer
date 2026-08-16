@@ -66,6 +66,7 @@ contract Governance is Ownable, ReentrancyGuard {
     event ProposalExecuted(uint256 indexed proposalId);
     event ProposalCancelled(uint256 indexed proposalId);
     event VoterRegistered(address indexed voter, uint256 votingPower);
+    event GovernanceParamsUpdated(uint256 votingPeriod, uint256 quorum, uint256 executionDelay);
 
     // ═══════════════════════════════════════════════════════════════
     //                        CONSTRUCTOR
@@ -99,6 +100,20 @@ contract Governance is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Open voter registration — any address can register itself with
+     *         1 voting power. Higher weights can still only be granted by the
+     *         owner via {registerVoter}.
+     */
+    function selfRegister() external {
+        require(votingPower[msg.sender] == 0, "Governance: already registered");
+
+        votingPower[msg.sender] = 1;
+        totalVoters++;
+
+        emit VoterRegistered(msg.sender, 1);
+    }
+
+    /**
      * @notice Update governance parameters
      */
     function setGovernanceParams(
@@ -109,6 +124,8 @@ contract Governance is Ownable, ReentrancyGuard {
         votingPeriod = _votingPeriod;
         quorum = _quorum;
         executionDelay = _executionDelay;
+
+        emit GovernanceParamsUpdated(_votingPeriod, _quorum, _executionDelay);
     }
 
     // ═══════════════════════════════════════════════════════════════

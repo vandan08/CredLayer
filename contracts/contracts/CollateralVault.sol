@@ -55,6 +55,7 @@ contract CollateralVault is Ownable, Pausable, ReentrancyGuard {
     event CollateralLocked(address indexed user, uint256 amount);
     event CollateralUnlocked(address indexed user, uint256 amount);
     event CollateralLiquidated(address indexed user, uint256 amount);
+    event LendingPoolUpdated(address indexed previousPool, address indexed newPool);
 
     // ═══════════════════════════════════════════════════════════════
     //                         MODIFIERS
@@ -93,6 +94,7 @@ contract CollateralVault is Ownable, Pausable, ReentrancyGuard {
      */
     function setLendingPool(address _lendingPool) external onlyOwner {
         require(_lendingPool != address(0), "CollateralVault: zero address");
+        emit LendingPoolUpdated(lendingPool, _lendingPool);
         lendingPool = _lendingPool;
     }
 

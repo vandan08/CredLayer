@@ -29,6 +29,9 @@ contract CreditRegistry is ICreditRegistry, Ownable, Pausable {
     /// @notice Total number of registered borrowers
     uint256 public totalBorrowers;
 
+    /// @notice Emitted when the authorized oracle address changes
+    event OracleUpdated(address indexed previousOracle, address indexed newOracle);
+
     // Risk band thresholds
     uint256 public constant BAND_A_THRESHOLD = 800;
     uint256 public constant BAND_B_THRESHOLD = 600;
@@ -80,6 +83,7 @@ contract CreditRegistry is ICreditRegistry, Ownable, Pausable {
      */
     function setOracle(address newOracle) external onlyOwner {
         require(newOracle != address(0), "CreditRegistry: oracle is zero address");
+        emit OracleUpdated(oracle, newOracle);
         oracle = newOracle;
     }
 

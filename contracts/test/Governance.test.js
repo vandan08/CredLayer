@@ -44,6 +44,22 @@ describe("Governance", function () {
                 governance.connect(nonVoter).registerVoter(nonVoter.address, 1)
             ).to.be.reverted;
         });
+
+        it("Should allow anyone to self-register with power 1", async function () {
+            await expect(governance.connect(nonVoter).selfRegister())
+                .to.emit(governance, "VoterRegistered")
+                .withArgs(nonVoter.address, 1);
+
+            expect(await governance.votingPower(nonVoter.address)).to.equal(1);
+            expect(await governance.totalVoters()).to.equal(5n); // owner + 3 voters + self-registered
+        });
+
+        it("Should revert self-registration if already registered", async function () {
+            await governance.connect(nonVoter).selfRegister();
+            await expect(
+                governance.connect(nonVoter).selfRegister()
+            ).to.be.revertedWith("Governance: already registered");
+        });
     });
 
     describe("Proposal Creation", function () {
