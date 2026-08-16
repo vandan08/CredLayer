@@ -3,6 +3,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Ticker } from "@/components/layout/Ticker";
 import { CustomCursor } from "@/components/ui/CustomCursor";
+import { Toaster } from "@/components/ui/Toaster";
 import { Web3Provider } from "@/lib/web3/provider";
 
 export const metadata: Metadata = {
@@ -18,11 +19,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CustomCursor />
           <div className="flex min-h-screen">
             <Sidebar />
-            <main className="ml-[220px] flex-1 flex flex-col overflow-x-hidden max-w-[calc(100vw-220px)]">
+            <main className="lg:ml-[220px] flex-1 flex flex-col overflow-x-hidden max-w-full lg:max-w-[calc(100vw-220px)]">
               <Ticker />
               <div className="flex-1">{children}</div>
             </main>
           </div>
+          <Toaster />
         </Web3Provider>
       </body>
     </html>
