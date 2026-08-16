@@ -5,6 +5,8 @@ import { useAccount, useWriteContract, useReadContract } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { POOL_DATA } from "@/lib/data";
 import { LENDING_POOL_ABI, ERC20_ABI, ADDRESSES } from "@/lib/web3/contracts";
+import { FaucetButton } from "@/components/ui/FaucetButton";
+import { toast } from "@/components/ui/Toaster";
 import { clsx } from "clsx";
 
 const POOL_BREAKDOWN = [
@@ -50,7 +52,7 @@ export default function LendPage() {
     query: { enabled: isConnected },
   });
 
-  const { data: rawBalance } = useReadContract({
+  const { data: rawBalance, refetch: refetchBalance } = useReadContract({
     address: ADDRESSES.MOCK_USDC,
     abi: ERC20_ABI,
     functionName: "balanceOf",
@@ -58,8 +60,28 @@ export default function LendPage() {
     query: { enabled: isConnected && !!address },
   });
 
+  // Live share preview for the current slider amount (pool shares minted on deposit)
+  const { data: rawSharePreview } = useReadContract({
+    address: ADDRESSES.LENDING_POOL,
+    abi: LENDING_POOL_ABI,
+    functionName: "convertToShares",
+    args: [parseUnits(String(amount), 6)],
+    query: { enabled: isConnected },
+  });
+
+  // Current share price: USDC value of 1 dcUSDC (1e9 share units)
+  const { data: rawShareRate } = useReadContract({
+    address: ADDRESSES.LENDING_POOL,
+    abi: LENDING_POOL_ABI,
+    functionName: "convertToAssets",
+    args: [parseUnits("1", 9)],
+    query: { enabled: isConnected },
+  });
+
   const userDeposit = rawUserDeposit ? Number(formatUnits(rawUserDeposit as bigint, 6)) : 0;
   const usdcBalance = rawBalance ? Number(formatUnits(rawBalance as bigint, 6)) : 0;
+  const sharePreview = rawSharePreview ? Number(formatUnits(rawSharePreview as bigint, 9)) : null;
+  const shareRate = rawShareRate ? Number(formatUnits(rawShareRate as bigint, 6)) : null;
   const totalDeposited = rawTotalDeposits ? Number(formatUnits(rawTotalDeposits as bigint, 6)) : POOL_DATA.totalDeposited;
   const totalBorrowed = rawTotalBorrowed ? Number(formatUnits(rawTotalBorrowed as bigint, 6)) : POOL_DATA.totalBorrowed;
   const utilizationRate = totalDeposited > 0 ? (totalBorrowed / totalDeposited) * 100 : POOL_DATA.utilizationRate;
@@ -79,6 +101,7 @@ export default function LendPage() {
     try {
       setErrorMsg(null);
       const amountWei = parseUnits(String(amount), 6);
+      let hash: `0x${string}`;
 
       if (tab === "deposit") {
         // Step 1: Approve
@@ -92,55 +115,62 @@ export default function LendPage() {
 
         // Step 2: Deposit
         setBtnState("confirming");
-        const hash = await writeAsync({
+        hash = await writeAsync({
           address: ADDRESSES.LENDING_POOL,
           abi: LENDING_POOL_ABI,
           functionName: "deposit",
           args: [amountWei],
         });
-        setTxHash(hash);
       } else {
         // Withdraw
         setBtnState("confirming");
-        const hash = await writeAsync({
+        hash = await writeAsync({
           address: ADDRESSES.LENDING_POOL,
           abi: LENDING_POOL_ABI,
           functionName: "withdraw",
           args: [amountWei],
         });
-        setTxHash(hash);
       }
+      setTxHash(hash);
 
       setBtnState("success");
+      toast({
+        kind: "success",
+        title: tab === "deposit" ? "Deposit confirmed" : "Withdrawal confirmed",
+        message: `$${amount.toLocaleString()} USDC ${tab === "deposit" ? "supplied to" : "withdrawn from"} the pool.`,
+        txHash: hash,
+      });
       setTimeout(() => setBtnState("idle"), 5000);
     } catch (err: any) {
       console.error("Lend action failed:", err);
-      setErrorMsg(err?.shortMessage || err?.message || "Transaction failed");
+      const msg = err?.shortMessage || err?.message || "Transaction failed";
+      setErrorMsg(msg);
+      toast({ kind: "error", title: `${tab === "deposit" ? "Deposit" : "Withdrawal"} failed`, message: msg });
       setBtnState("error");
       setTimeout(() => setBtnState("idle"), 5000);
     }
   };
 
   return (
-    <div className="p-14 max-w-[1100px]">
+    <div className="p-6 md:p-10 lg:p-14 max-w-[1100px]">
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">01 — Liquidity Pool</span>
           <div className="flex-1 h-px bg-border" />
         </div>
-        <h1 className="font-serif text-[42px] font-bold tracking-[-1px] leading-none mb-1">Lend</h1>
+        <h1 className="font-serif text-[32px] md:text-[42px] font-bold tracking-[-1px] leading-none mb-1">Lend</h1>
         <p className="text-[11px] text-ink-muted font-mono">Provide USDC liquidity. Earn yield from borrower interest.</p>
       </div>
 
       {/* Pool stats */}
-      <div className="grid grid-cols-4 border border-border mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 border border-border mb-8">
         {[
           { label: "Total Deposited", value: `$${(totalDeposited / 1e6).toFixed(2)}M`, sub: "Available liquidity" },
           { label: "Currently Borrowed", value: `$${(totalBorrowed / 1e6).toFixed(2)}M`, sub: "Active loans" },
           { label: "Utilization Rate", value: `${utilizationRate.toFixed(1)}%`, sub: "Pool efficiency" },
           { label: "Lender APY", value: `${estApy}%`, sub: "Current yield rate" },
         ].map((s, i) => (
-          <div key={i} className={clsx("p-7", i < 3 && "border-r border-border")}>
+          <div key={i} className={clsx("p-7 border-border", i % 2 === 0 && "border-r", i < 3 && "lg:border-r", i < 2 && "border-b lg:border-b-0")}>
             <div className="label mb-2">{s.label}</div>
             <div className="font-serif text-[28px] font-bold tracking-[-1px] leading-none">{s.value}</div>
             <div className="text-[10px] text-ink-muted font-mono mt-1">{s.sub}</div>
@@ -166,7 +196,7 @@ export default function LendPage() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-4 gap-0">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0">
             {POOL_BREAKDOWN.map((b) => (
               <div key={b.band} className="flex items-center gap-2 p-3">
                 <div className="w-2 h-2 shrink-0" style={{ background: b.color }} />
@@ -180,7 +210,7 @@ export default function LendPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[3fr_2fr] gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-8">
         {/* Deposit / Withdraw form */}
         <div className="panel">
           {/* Tabs */}
@@ -202,9 +232,22 @@ export default function LendPage() {
           <div className="p-8 space-y-6">
             {/* Wallet balance */}
             {isConnected && (
-              <div className="text-[9px] font-mono text-ink-faint tracking-[1px]">
-                WALLET BALANCE: ${usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC
-                {userDeposit > 0 && ` · DEPOSITED: $${userDeposit.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="text-[9px] font-mono text-ink-faint tracking-[1px]">
+                  WALLET BALANCE: ${usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC
+                  {userDeposit > 0 && ` · POSITION: $${userDeposit.toLocaleString(undefined, { maximumFractionDigits: 2 })} (incl. yield)`}
+                </div>
+                <div className="flex items-center gap-2">
+                  {tab === "withdraw" && userDeposit > 0 && (
+                    <button
+                      onClick={() => setAmount(Math.max(1, Math.floor(userDeposit)))}
+                      className="text-[8px] tracking-[2px] uppercase font-semibold font-mono px-3 py-[6px] border border-ink text-ink hover:bg-ink hover:text-bg transition-all"
+                    >
+                      Max
+                    </button>
+                  )}
+                  <FaucetButton onMinted={() => refetchBalance()} />
+                </div>
               </div>
             )}
 
@@ -231,15 +274,20 @@ export default function LendPage() {
               </div>
             </div>
 
-            {/* LP Token info */}
+            {/* LP share info — live pool share preview when connected */}
             {tab === "deposit" && (
               <div className="bg-surface p-5 border-l-2 border-ink">
-                <div className="label mb-2">LP Tokens Received</div>
+                <div className="label mb-2">
+                  Pool Shares Received
+                  {sharePreview !== null && <span className="ml-2 text-chartreuse">● LIVE</span>}
+                </div>
                 <div className="font-serif text-[28px] font-bold tracking-[-1px]">
-                  {(amount * 0.9984).toFixed(2)} dcUSDC
+                  {(sharePreview ?? amount).toLocaleString(undefined, { maximumFractionDigits: 2 })} dcUSDC
                 </div>
                 <div className="text-[10px] text-ink-muted font-mono mt-1">
-                  Exchange rate: 1 USDC = 0.9984 dcUSDC
+                  {shareRate !== null
+                    ? `Share price: 1 dcUSDC = ${shareRate.toFixed(6)} USDC — rises as interest is repaid`
+                    : "Share price starts at 1.000000 and rises as interest is repaid"}
                 </div>
               </div>
             )}
@@ -320,7 +368,7 @@ export default function LendPage() {
       </div>
 
       <style>{`
-        input[type="range"]::-webkit-slider-thumb {
+        input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
           width: 16px; height: 16px;
           background: #1A1915; cursor: none;
