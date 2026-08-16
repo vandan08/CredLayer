@@ -26,6 +26,16 @@ coverage/
 .env.local
 .env.*.local
 
+# Local-chain deploy records (ephemeral); real networks are committed
+contracts/deployments/hardhat.json
+contracts/deployments/localhost.json
+
+# Next.js incremental build cache
+*.tsbuildinfo
+
+# Claude Code local tooling
+.claude/
+
 # ─── Editors / OS ───────────────────────────────────────────────
 .idea/
 .vscode/
