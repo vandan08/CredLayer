@@ -1,0 +1,30 @@
+# Gitleaks configuration for CredLayer
+#
+# Extends the default ruleset and allowlists the well-known Hardhat
+# development keys. Those are published by the Hardhat project itself, are
+# funded only on ephemeral local chains, and are intentionally checked in as
+# defaults so the stack runs out of the box. Every real deployment overrides
+# them via environment variables (see DEPLOYMENT.md).
+
+title = "CredLayer Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Publicly-known local development keys and generated lockfiles"
+
+regexes = [
+  # Hardhat default account #0 private key — the canonical public test key.
+  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+  # Local Postgres credentials used by docker-compose for local dev only.
+  '''credpassword''',
+]
+
+paths = [
+  # Deterministic local Hardhat addresses (public data, not secrets)
+  '''frontend/decredit-protocol/lib/web3/deployed\.json''',
+  '''contracts/deployments/.*\.json''',
+  # Dependency lockfiles produce integrity-hash false positives
+  '''package-lock\.json''',
+]

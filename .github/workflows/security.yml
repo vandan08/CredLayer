@@ -1,0 +1,110 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly re-scan so newly-disclosed advisories surface even without a push
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Static analysis of the Solidity contracts ────────────────
+  slither:
+    name: Slither (Solidity static analysis)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to the Security tab
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install contract dependencies
+        run: npm ci
+        working-directory: contracts
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        id: slither
+        continue-on-error: true
+        with:
+          target: contracts/
+          slither-config: contracts/slither.config.json
+          sarif: results.sarif
+          # Only genuine high-severity findings break the build. Medium/low/
+          # informational still appear in the SARIF report and job log.
+          fail-on: high
+
+      - name: Upload SARIF to GitHub Security
+        if: always() && steps.slither.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.slither.outputs.sarif }}
+
+      - name: Fail if Slither reported a high-severity issue
+        if: steps.slither.outcome == 'failure'
+        run: |
+          echo "::error::Slither reported high-severity findings — see the Security tab."
+          exit 1
+
+  # ─── Dependency vulnerability scanning ────────────────────────
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: contracts
+            path: contracts
+          - name: frontend
+            path: frontend/decredit-protocol
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Gate on shipped code: a critical advisory in a production dependency
+      # breaks the build. Dev-only tooling advisories do not.
+      - name: npm audit — production dependencies (blocking)
+        run: npm audit --omit=dev --audit-level=critical
+        working-directory: ${{ matrix.path }}
+
+      # Full picture, including dev tooling and high-severity advisories whose
+      # only fix is a major upgrade. Reported for triage, does not gate.
+      # See SECURITY.md §6 for the currently-accepted advisories.
+      - name: npm audit — full report (informational)
+        run: npm audit || true
+        working-directory: ${{ matrix.path }}
+
+  # ─── Secret scanning ──────────────────────────────────────────
+  secrets:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so historical leaks are caught
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
