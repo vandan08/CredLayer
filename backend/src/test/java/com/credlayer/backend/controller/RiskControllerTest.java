@@ -2,6 +2,7 @@ package com.credlayer.backend.controller;
 
 import com.credlayer.backend.model.User;
 import com.credlayer.backend.repository.UserRepository;
+import com.credlayer.backend.service.OracleUpdateService;
 import com.credlayer.backend.service.RiskModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,12 @@ class RiskControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    @MockBean
+    private OracleUpdateService oracleUpdateService;
+
     private final String testAddress = "0x1234567890123456789012345678901234567890";
+
+    private final BigInteger duration = BigInteger.valueOf(30L * 24 * 60 * 60);
 
     @Test
     void testGetCreditScore_ExistingUser() throws Exception {
@@ -76,10 +82,12 @@ class RiskControllerTest {
             terms,
             System.currentTimeMillis() / 1000 + 3600,
             requestedAmount,
+            duration,
+            new BigInteger("2000000000000000000000"),
             "0xabcdef1234567890"
         );
 
-        when(riskModelService.generateLoanApproval(eq(testAddress), eq(requestedAmount)))
+        when(riskModelService.generateLoanApproval(eq(testAddress), eq(requestedAmount), any()))
             .thenReturn(approval);
 
         RiskController.LoanRequestDto request = new RiskController.LoanRequestDto();
@@ -99,7 +107,7 @@ class RiskControllerTest {
     void testRequestLoanApproval_AmountExceedsMax_ReturnsBadRequest() throws Exception {
         BigInteger excessiveAmount = new BigInteger("99999999999999999999999");
 
-        when(riskModelService.generateLoanApproval(eq(testAddress), eq(excessiveAmount)))
+        when(riskModelService.generateLoanApproval(eq(testAddress), eq(excessiveAmount), any()))
             .thenThrow(new IllegalArgumentException("Requested amount exceeds risk limit for this borrower."));
 
         RiskController.LoanRequestDto request = new RiskController.LoanRequestDto();
@@ -159,10 +167,12 @@ class RiskControllerTest {
             terms,
             System.currentTimeMillis() / 1000 + 3600,
             requestedAmount,
+            duration,
+            new BigInteger("2100000000000000000000"),
             "0xsignature"
         );
 
-        when(riskModelService.generateLoanApproval(eq(testAddress), eq(requestedAmount)))
+        when(riskModelService.generateLoanApproval(eq(testAddress), eq(requestedAmount), any()))
             .thenReturn(approval);
 
         RiskController.LoanRequestDto request = new RiskController.LoanRequestDto();
