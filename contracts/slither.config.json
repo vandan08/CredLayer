@@ -1,0 +1,7 @@
+{
+  "detectors_to_exclude": "naming-convention,solc-version,pragma",
+  "filter_paths": "node_modules|artifacts|cache|contracts/MockUSDC.sol",
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_optimization": true
+}

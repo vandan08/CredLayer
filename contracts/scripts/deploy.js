@@ -1,4 +1,6 @@
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
     const [deployer] = await hre.ethers.getSigners();
@@ -58,6 +60,56 @@ async function main() {
     await collateralVault.setLendingPool(lendingPoolAddress);
     console.log("✅ CollateralVault → LendingPool linked");
 
+    // ─── 7. Seed local demo state ─────────────────────────────────
+    // Give the pool starting liquidity and register the deployer so the
+    // borrow/repay flow works immediately against a fresh Hardhat node.
+    console.log("\n🌱 Seeding demo state...");
+    const seedLiquidity = 500_000n * 10n ** 6n; // 500,000 USDC
+    await (await usdc.approve(lendingPoolAddress, seedLiquidity)).wait();
+    await (await lendingPool.deposit(seedLiquidity)).wait();
+    console.log(`✅ Seeded LendingPool with ${seedLiquidity / 10n ** 6n} USDC of liquidity`);
+
+    await (await creditRegistry.registerBorrower(deployer.address)).wait();
+    console.log(`✅ Registered deployer as a borrower (default score 500 / Band C)`);
+
+    // Seed one governance proposal so the frontend has live DAO content.
+    const proposalCallData = lendingPool.interface.encodeFunctionData(
+        "setMaxLoanAmount", [150_000n * 10n ** 6n]
+    );
+    await (await governance.createProposal(
+        "GIP-1: Raise the protocol max loan amount from 100,000 to 150,000 USDC to support larger Band A borrowers.",
+        lendingPoolAddress,
+        proposalCallData
+    )).wait();
+    console.log("✅ Seeded demo governance proposal (GIP-1)");
+
+    // ─── 8. Persist addresses ─────────────────────────────────────
+    const addresses = {
+        MockUSDC: usdcAddress,
+        CreditRegistry: creditRegistryAddress,
+        CollateralVault: collateralVaultAddress,
+        LendingPool: lendingPoolAddress,
+        Governance: governanceAddress,
+    };
+
+    // (a) A per-network record under contracts/deployments/
+    const network = hre.network.name;
+    const deploymentsDir = path.join(__dirname, "..", "deployments");
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+    fs.writeFileSync(
+        path.join(deploymentsDir, `${network}.json`),
+        JSON.stringify(addresses, null, 2) + "\n"
+    );
+
+    // (b) The file the frontend imports directly.
+    const frontendFile = path.join(
+        __dirname, "..", "..", "frontend", "decredit-protocol", "lib", "web3", "deployed.json"
+    );
+    if (fs.existsSync(path.dirname(frontendFile))) {
+        fs.writeFileSync(frontendFile, JSON.stringify(addresses, null, 2) + "\n");
+        console.log(`✅ Wrote frontend addresses → ${path.relative(process.cwd(), frontendFile)}`);
+    }
+
     // ─── Summary ──────────────────────────────────────────────────
     console.log("\n" + "═".repeat(50));
     console.log("📋 DEPLOYMENT SUMMARY");
@@ -68,6 +120,12 @@ async function main() {
     console.log(`LendingPool:     ${lendingPoolAddress}`);
     console.log(`Governance:      ${governanceAddress}`);
     console.log("═".repeat(50));
+    console.log("\n👉 Update the backend so it can act as the oracle & listen for events:");
+    console.log("   backend/src/main/resources/application.yml");
+    console.log(`     credlayer.contracts.credit-registry: "${creditRegistryAddress}"`);
+    console.log(`     credlayer.contracts.lending-pool:     "${lendingPoolAddress}"`);
+    console.log("\n   Note: the oracle key (Hardhat account #0) is the deployer, which is");
+    console.log("   the CreditRegistry oracle and LendingPool approvalSigner by default.");
 }
 
 main()
