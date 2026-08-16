@@ -1,33 +1,33 @@
-# dependencies
-node_modules
-
-# testing
-coverage
-
-# hardhat
-cache
-artifacts
-typechain
-typechain-types
-
-# env files
-.env
-.env.example
-
-# misc
-.DS_Store
-*.log
-
-/backend/.idea
-*.gitignore
-
-.next/
+# ─── Dependencies ───────────────────────────────────────────────
 node_modules/
+
+# ─── Build output ───────────────────────────────────────────────
+# Solidity / Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# Java / Maven
+target/
+
+# Next.js
+.next/
 out/
 dist/
+
+# ─── Testing ────────────────────────────────────────────────────
 coverage/
 
-.idea
-/frontend/decredit-protocol/.eslintrc.json
-/backend/target/
-.gitignore
+# ─── Secrets ────────────────────────────────────────────────────
+# Real env files are never committed. The .env.example templates ARE
+# committed — they document required configuration without any secrets.
+.env
+.env.local
+.env.*.local
+
+# ─── Editors / OS ───────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+*.log
