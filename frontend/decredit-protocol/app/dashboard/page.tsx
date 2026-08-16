@@ -182,7 +182,7 @@ function ScoreDigits({ score }: { score: number }) {
   }, [score]);
 
   return (
-    <span className="font-serif text-[110px] font-black leading-none tracking-[-4px]">
+    <span className="font-serif text-[72px] md:text-[110px] font-black leading-none tracking-[-4px]">
       {displayed}
     </span>
   );
@@ -243,8 +243,8 @@ export default function Dashboard() {
   const profile = rawProfile
     ? {
       totalLoans: Number((rawProfile as any).totalLoans),
-      successfulRepayments: Number((rawProfile as any).successfulRepayments),
-      defaults: Number((rawProfile as any).defaults),
+      successfulRepayments: Number((rawProfile as any).repaidLoans),
+      defaults: Number((rawProfile as any).defaultedLoans),
     }
     : { totalLoans: 5, successfulRepayments: 5, defaults: 0 };
 
@@ -255,7 +255,7 @@ export default function Dashboard() {
   const scoreDelta = BORROWER.scoreDelta; // Would need historical data for real delta
 
   return (
-    <div className="p-14 max-w-[1200px]">
+    <div className="p-6 md:p-10 lg:p-14 max-w-[1200px]">
       {/* Connection banner */}
       {!isConnected && (
         <div className="bg-surface border-l-2 border-l-amber border border-border px-6 py-4 mb-6 flex items-center gap-4">
@@ -280,7 +280,7 @@ export default function Dashboard() {
           <span className="text-[10px] tracking-[3px] uppercase text-ink-faint font-mono">01 — Borrower Overview</span>
           <div className="flex-1 h-px bg-border" />
         </div>
-        <h1 className="font-serif text-[42px] font-bold tracking-[-1px] leading-none mb-1">Credit Dashboard</h1>
+        <h1 className="font-serif text-[32px] md:text-[42px] font-bold tracking-[-1px] leading-none mb-1">Credit Dashboard</h1>
         <p className="text-[11px] text-ink-muted font-mono tracking-wide">
           {isConnected && address
             ? `Wallet: ${address.slice(0, 6)}...${address.slice(-4)}`
@@ -290,8 +290,8 @@ export default function Dashboard() {
       </div>
 
       {/* Score + Gauge */}
-      <div className="border border-border grid grid-cols-2 mb-0">
-        <div className="p-12 border-r border-border relative overflow-hidden">
+      <div className="border border-border grid grid-cols-1 lg:grid-cols-2 mb-0">
+        <div className="p-8 md:p-12 border-b lg:border-b-0 lg:border-r border-border relative overflow-hidden">
           <div className="label mb-4">
             Credit Score
             {isConnected && <span className="ml-2 text-chartreuse">● LIVE</span>}
@@ -310,7 +310,7 @@ export default function Dashboard() {
           <div className="text-[11px] text-green font-mono mt-2 relative z-10">▲ +{scoreDelta} since last evaluation</div>
         </div>
 
-        <div className="p-12">
+        <div className="p-8 md:p-12">
           <div className="label mb-6">Score Range Indicator</div>
           <VUMeter score={score} />
           <div className="mt-8 space-y-0">
@@ -330,13 +330,13 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 border-x border-b border-border mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 border-x border-b border-border mb-10">
         {[
           { label: "Total Borrowed", value: `$${BORROWER.totalBorrowed.toLocaleString()}`, sub: `Across ${profile.totalLoans} completed loans` },
           { label: "Repayment Rate", value: `${repaymentRate}%`, sub: `${profile.defaults} defaults on record` },
           { label: "Pool Participation", value: `$${BORROWER.poolSupplied.toLocaleString()}`, sub: "Supplied as liquidity" },
         ].map((s, i) => (
-          <div key={i} className={clsx("p-8", i < 2 && "border-r border-border")}>
+          <div key={i} className={clsx("p-8 border-border", i < 2 && "sm:border-r border-b sm:border-b-0")}>
             <div className="label mb-2">{s.label}</div>
             <div className="font-serif text-[32px] font-bold tracking-[-1px] leading-none">{s.value}</div>
             <div className="text-[10px] text-ink-muted font-mono mt-2">{s.sub}</div>
@@ -356,8 +356,8 @@ export default function Dashboard() {
             <span className="panel-title">Repayment History</span>
             <span className="text-[9px] text-ink-faint font-mono tracking-[1px]">All time</span>
           </div>
-          <div className="px-7 pb-4">
-            <table className="w-full text-[11px] font-mono border-collapse">
+          <div className="px-7 pb-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-[11px] font-mono border-collapse">
               <thead>
                 <tr className="border-b-2 border-ink">
                   {["Loan ID", "Amount", "Duration", "Rate", "Date", "Status"].map((h) => (
