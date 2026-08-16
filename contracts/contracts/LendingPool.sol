@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "./interfaces/ICreditRegistry.sol";
+import "./interfaces/ILendingPool.sol";
 import "./CollateralVault.sol";
 
 /**
@@ -21,28 +22,13 @@ import "./CollateralVault.sol";
  *      Band C: 14% (1400 bps)
  *      Band D: 14% (1400 bps)
  */
-contract LendingPool is Ownable, Pausable, ReentrancyGuard {
+contract LendingPool is ILendingPool, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
-    // ═══════════════════════════════════════════════════════════════
-    //                          TYPES
-    // ═══════════════════════════════════════════════════════════════
-
-    enum LoanStatus { Active, Repaid, Defaulted, Liquidated }
-
-    struct Loan {
-        uint256 loanId;
-        address borrower;
-        uint256 amount;
-        uint256 collateralAmount;
-        uint256 interestRate;       // basis points (500 = 5%)
-        uint256 dueDate;
-        uint256 repaidAmount;
-        LoanStatus status;
-        uint256 createdAt;
-    }
+    // Loan / LoanStatus types and the core protocol events are declared in
+    // ILendingPool, which this contract implements.
 
     // ═══════════════════════════════════════════════════════════════
     //                          STATE
@@ -55,6 +41,11 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
     /// @notice Backend signer address for loan approval signatures
     address public approvalSigner;
 
+    /// @notice Approval hashes that have already been consumed.
+    ///         Prevents a single backend-signed approval from being replayed
+    ///         for multiple loans within its deadline window.
+    mapping(bytes32 => bool) public usedApprovals;
+
     /// @notice All loans
     mapping(uint256 => Loan) public loans;
     uint256 public nextLoanId;
@@ -62,9 +53,27 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
     /// @notice Borrower's active loan IDs
     mapping(address => uint256[]) public borrowerLoans;
 
-    /// @notice Liquidity provider deposits
-    mapping(address => uint256) public deposits;
-    uint256 public totalDeposits;
+    // ─── ERC-4626-style share accounting ────────────────────────
+    // Lenders receive pool shares on deposit instead of a flat principal
+    // balance. Share price = totalAssets() / totalShares, where totalAssets
+    // counts idle cash PLUS outstanding loan principal (a receivable).
+    // Repaid interest and seized collateral raise the share price, so yield
+    // and liquidation gains/losses accrue to all lenders pro-rata.
+    //
+    // Interest is only recognised when it is actually repaid (no accrual of
+    // unpaid interest into NAV), and defaulted loans keep counting at face
+    // value until someone calls the permissionless liquidate().
+
+    /// @notice Pool shares held per liquidity provider
+    mapping(address => uint256) public sharesOf;
+    uint256 public totalShares;
+
+    /// @dev Virtual offset (OpenZeppelin-style "decimal offset") that makes
+    ///      donation/inflation attacks against early depositors unprofitable:
+    ///      conversion behaves as if 10^3 shares and 1 asset already exist.
+    uint256 private constant VIRTUAL_SHARES = 1e3;
+    uint256 private constant VIRTUAL_ASSETS = 1;
+
     uint256 public totalBorrowed;
 
     // Interest rates in basis points
@@ -82,19 +91,14 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
     //                          EVENTS
     // ═══════════════════════════════════════════════════════════════
 
-    event Deposited(address indexed provider, uint256 amount);
-    event Withdrawn(address indexed provider, uint256 amount);
-    event LoanCreated(
-        uint256 indexed loanId,
-        address indexed borrower,
-        uint256 amount,
-        uint256 interestRate,
-        uint256 collateralAmount,
-        uint256 dueDate
-    );
-    event LoanRepaid(uint256 indexed loanId, address indexed borrower, uint256 totalPaid);
-    event Liquidated(uint256 indexed loanId, address indexed borrower, uint256 collateralSeized);
-    event Defaulted(uint256 indexed loanId, address indexed borrower);
+    // Deposited / Withdrawn / LoanCreated / LoanRepaid / Liquidated / Defaulted
+    // are inherited from ILendingPool.
+
+    // Admin actions — emitted so off-chain monitoring can alert on any change
+    // to security-critical protocol parameters.
+    event ApprovalSignerUpdated(address indexed previousSigner, address indexed newSigner);
+    event InterestRatesUpdated(uint256 rateA, uint256 rateB, uint256 rateC, uint256 rateD);
+    event MaxLoanAmountUpdated(uint256 previousAmount, uint256 newAmount);
 
     // ═══════════════════════════════════════════════════════════════
     //                        CONSTRUCTOR
@@ -129,6 +133,7 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
 
     function setApprovalSigner(address _signer) external onlyOwner {
         require(_signer != address(0), "LendingPool: zero address");
+        emit ApprovalSignerUpdated(approvalSigner, _signer);
         approvalSigner = _signer;
     }
 
@@ -142,9 +147,12 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
         interestRateB = _rateB;
         interestRateC = _rateC;
         interestRateD = _rateD;
+
+        emit InterestRatesUpdated(_rateA, _rateB, _rateC, _rateD);
     }
 
     function setMaxLoanAmount(uint256 _amount) external onlyOwner {
+        emit MaxLoanAmountUpdated(maxLoanAmount, _amount);
         maxLoanAmount = _amount;
     }
 
@@ -156,35 +164,66 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * @notice Deposit lending tokens into the pool
+     * @notice Deposit lending tokens into the pool in exchange for pool shares
      * @param amount Amount of tokens to deposit
      */
     function deposit(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "LendingPool: amount must be > 0");
 
-        lendingToken.safeTransferFrom(msg.sender, address(this), amount);
-        deposits[msg.sender] += amount;
-        totalDeposits += amount;
+        // Price the shares BEFORE the transfer changes the pool balance.
+        uint256 shares = convertToShares(amount);
+        require(shares > 0, "LendingPool: deposit too small");
 
-        emit Deposited(msg.sender, amount);
+        lendingToken.safeTransferFrom(msg.sender, address(this), amount);
+        sharesOf[msg.sender] += shares;
+        totalShares += shares;
+
+        emit Deposited(msg.sender, amount, shares);
     }
 
     /**
-     * @notice Withdraw deposited tokens from the pool
-     * @param amount Amount of tokens to withdraw
+     * @notice Withdraw an exact asset amount by burning the equivalent shares
+     * @param amount Amount of tokens to withdraw (principal + accrued yield)
      */
     function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "LendingPool: amount must be > 0");
-        require(deposits[msg.sender] >= amount, "LendingPool: insufficient deposit");
+
+        // Round shares up so a withdrawer can never extract more value than
+        // their shares are worth.
+        uint256 shares = _convertToSharesUp(amount);
+        require(sharesOf[msg.sender] >= shares, "LendingPool: insufficient deposit");
 
         uint256 availableLiquidity = lendingToken.balanceOf(address(this));
         require(availableLiquidity >= amount, "LendingPool: insufficient liquidity");
 
-        deposits[msg.sender] -= amount;
-        totalDeposits -= amount;
+        sharesOf[msg.sender] -= shares;
+        totalShares -= shares;
         lendingToken.safeTransfer(msg.sender, amount);
 
-        emit Withdrawn(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount, shares);
+    }
+
+    /**
+     * @notice Redeem an exact number of shares for their current asset value.
+     *         Use `redeem(sharesOf(msg.sender))` to exit a position completely
+     *         without leaving rounding dust behind.
+     * @param shares Number of pool shares to burn
+     */
+    function redeem(uint256 shares) external nonReentrant whenNotPaused {
+        require(shares > 0, "LendingPool: shares must be > 0");
+        require(sharesOf[msg.sender] >= shares, "LendingPool: insufficient shares");
+
+        uint256 amount = convertToAssets(shares);
+        require(amount > 0, "LendingPool: redeem too small");
+
+        uint256 availableLiquidity = lendingToken.balanceOf(address(this));
+        require(availableLiquidity >= amount, "LendingPool: insufficient liquidity");
+
+        sharesOf[msg.sender] -= shares;
+        totalShares -= shares;
+        lendingToken.safeTransfer(msg.sender, amount);
+
+        emit Withdrawn(msg.sender, amount, shares);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -218,6 +257,10 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
         bytes32 ethSignedHash = messageHash.toEthSignedMessageHash();
         address signer = ethSignedHash.recover(signature);
         require(signer == approvalSigner, "LendingPool: invalid signature");
+
+        // Replay protection: each signed approval is single-use.
+        require(!usedApprovals[messageHash], "LendingPool: approval already used");
+        usedApprovals[messageHash] = true;
 
         // Check credit-based collateral requirement
         uint256 requiredCollateral = collateralVault.getRequiredCollateral(msg.sender, amount);
@@ -356,17 +399,78 @@ contract LendingPool is Ownable, Pausable, ReentrancyGuard {
         return loan.amount + interest;
     }
 
+    // ─── Share accounting views ──────────────────────────────────
+
     /**
-     * @notice Pool utilization rate in basis points
+     * @notice Net asset value of the pool: idle cash plus outstanding loan
+     *         principal (a receivable owed back to the pool).
+     */
+    function totalAssets() public view returns (uint256) {
+        return lendingToken.balanceOf(address(this)) + totalBorrowed;
+    }
+
+    /**
+     * @notice Convert an asset amount to pool shares (rounds down).
+     * @dev Virtual shares/assets keep the rate well-defined for an empty pool
+     *      and blunt donation-based share-price manipulation.
+     */
+    function convertToShares(uint256 assets) public view returns (uint256) {
+        return (assets * (totalShares + VIRTUAL_SHARES)) / (totalAssets() + VIRTUAL_ASSETS);
+    }
+
+    /**
+     * @notice Convert pool shares to their current asset value (rounds down).
+     */
+    function convertToAssets(uint256 shares) public view returns (uint256) {
+        return (shares * (totalAssets() + VIRTUAL_ASSETS)) / (totalShares + VIRTUAL_SHARES);
+    }
+
+    /**
+     * @notice Maximum assets a provider could withdraw at the current share
+     *         price (subject to available liquidity).
+     */
+    function maxWithdraw(address provider) external view returns (uint256) {
+        return convertToAssets(sharesOf[provider]);
+    }
+
+    /**
+     * @notice Current asset value of a provider's position.
+     * @dev Kept as a function (same ABI as the former public mapping) so
+     *      existing integrations keep working; the value now includes yield.
+     */
+    function deposits(address provider) external view returns (uint256) {
+        return convertToAssets(sharesOf[provider]);
+    }
+
+    /**
+     * @notice Total value held by liquidity providers.
+     * @dev ABI-compatible replacement for the former state variable.
+     */
+    function totalDeposits() external view returns (uint256) {
+        return totalAssets();
+    }
+
+    /**
+     * @notice Pool utilization rate in basis points (borrowed / NAV)
      */
     function getUtilizationRate() external view returns (uint256) {
-        if (totalDeposits == 0) return 0;
-        return (totalBorrowed * 10000) / totalDeposits;
+        uint256 assets = totalAssets();
+        if (assets == 0) return 0;
+        return (totalBorrowed * 10000) / assets;
     }
 
     // ═══════════════════════════════════════════════════════════════
     //                     INTERNAL FUNCTIONS
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * @dev convertToShares with rounding UP — used when burning shares for an
+     *      exact asset withdrawal so rounding always favours the pool.
+     */
+    function _convertToSharesUp(uint256 assets) internal view returns (uint256) {
+        uint256 denominator = totalAssets() + VIRTUAL_ASSETS;
+        return (assets * (totalShares + VIRTUAL_SHARES) + denominator - 1) / denominator;
+    }
 
     function _getInterestRate(address borrower) internal view returns (uint256) {
         ICreditRegistry.RiskBand band = creditRegistry.getRiskBand(borrower);

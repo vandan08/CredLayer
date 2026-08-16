@@ -72,11 +72,20 @@ describe("LendingPool", function () {
             expect(await lendingPool.totalDeposits()).to.equal(toUSDC(10000));
         });
 
-        it("Should emit Deposited event", async function () {
+        it("Should emit Deposited event with assets and shares", async function () {
             await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(5000));
+            // Empty pool: shares = assets * VIRTUAL_SHARES (1e3)
             await expect(lendingPool.connect(lender).deposit(toUSDC(5000)))
                 .to.emit(lendingPool, "Deposited")
-                .withArgs(lender.address, toUSDC(5000));
+                .withArgs(lender.address, toUSDC(5000), toUSDC(5000) * 1000n);
+        });
+
+        it("Should track shares alongside asset value", async function () {
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(10000));
+            await lendingPool.connect(lender).deposit(toUSDC(10000));
+
+            expect(await lendingPool.sharesOf(lender.address)).to.equal(toUSDC(10000) * 1000n);
+            expect(await lendingPool.maxWithdraw(lender.address)).to.equal(toUSDC(10000));
         });
 
         it("Should allow withdrawals", async function () {
@@ -152,6 +161,27 @@ describe("LendingPool", function () {
             await expect(
                 lendingPool.connect(borrower).borrow(loanAmount, duration, collateralAmount, deadline, badSignature)
             ).to.be.revertedWith("LendingPool: invalid signature");
+        });
+
+        it("Should reject a replayed approval signature", async function () {
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
+            const signature = await signLoanApproval(
+                approvalSigner, borrower.address, loanAmount, duration, collateralAmount, deadline
+            );
+
+            // First borrow succeeds and consumes the approval
+            await lendingPool.connect(borrower).borrow(
+                loanAmount, duration, collateralAmount, deadline, signature
+            );
+
+            // Fund the vault again so only replay protection can block the second borrow
+            await usdc.connect(borrower).approve(await collateralVault.getAddress(), collateralAmount);
+            await collateralVault.connect(borrower).depositCollateral(collateralAmount);
+
+            await expect(
+                lendingPool.connect(borrower).borrow(loanAmount, duration, collateralAmount, deadline, signature)
+            ).to.be.revertedWith("LendingPool: approval already used");
         });
 
         it("Should revert if borrower not registered", async function () {
@@ -269,6 +299,138 @@ describe("LendingPool", function () {
             await expect(
                 lendingPool.connect(lender).liquidate(0)
             ).to.be.revertedWith("LendingPool: loan not overdue");
+        });
+    });
+
+    describe("Yield & Share Accounting", function () {
+        const loanAmount = toUSDC(5000);
+        const duration = 30 * 24 * 60 * 60;
+
+        async function openLoan(collateralAmount, loanDuration = duration) {
+            await usdc.connect(borrower).approve(await collateralVault.getAddress(), collateralAmount);
+            await collateralVault.connect(borrower).depositCollateral(collateralAmount);
+            const block = await ethers.provider.getBlock("latest");
+            const deadline = block.timestamp + 3600;
+            const signature = await signLoanApproval(
+                approvalSigner, borrower.address, loanAmount, loanDuration, collateralAmount, deadline
+            );
+            await lendingPool.connect(borrower).borrow(loanAmount, loanDuration, collateralAmount, deadline, signature);
+        }
+
+        it("Should pay repaid interest to the lender via share price appreciation", async function () {
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(100000));
+            await lendingPool.connect(lender).deposit(toUSDC(100000));
+
+            await openLoan(toUSDC(2000));
+
+            // 30 days pass → borrower owes ~20.55 USDC interest (5% APR on 5,000)
+            await ethers.provider.send("evm_increaseTime", [duration]);
+            await ethers.provider.send("evm_mine");
+            await usdc.connect(borrower).approve(await lendingPool.getAddress(), toUSDC(10000));
+            await lendingPool.connect(borrower).repay(0);
+
+            const value = await lendingPool.maxWithdraw(lender.address);
+            expect(value).to.be.gt(toUSDC(100000));
+            expect(value).to.be.gte(toUSDC(100000) + 20_000_000n); // ≥ +$20
+            expect(value).to.be.lt(toUSDC(100000) + 25_000_000n);  // < +$25
+
+            // The lender can actually realize the gain: ends richer than they started
+            await lendingPool.connect(lender).withdraw(value);
+            expect(await usdc.balanceOf(lender.address)).to.be.gt(toUSDC(500000));
+        });
+
+        it("Should split yield pro-rata between lenders", async function () {
+            // lender supplies 60k (75%), owner supplies 20k (25%)
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(60000));
+            await lendingPool.connect(lender).deposit(toUSDC(60000));
+            await usdc.connect(owner).approve(await lendingPool.getAddress(), toUSDC(20000));
+            await lendingPool.connect(owner).deposit(toUSDC(20000));
+
+            await openLoan(toUSDC(2000));
+            await ethers.provider.send("evm_increaseTime", [duration]);
+            await ethers.provider.send("evm_mine");
+            await usdc.connect(borrower).approve(await lendingPool.getAddress(), toUSDC(10000));
+            await lendingPool.connect(borrower).repay(0);
+
+            const gainA = (await lendingPool.maxWithdraw(lender.address)) - toUSDC(60000);
+            const gainB = (await lendingPool.maxWithdraw(owner.address)) - toUSDC(20000);
+
+            expect(gainA).to.be.gt(0n);
+            expect(gainB).to.be.gt(0n);
+            // 75/25 split → gainA ≈ 3 × gainB (allow small rounding drift)
+            expect(gainA).to.be.gte(gainB * 3n - 1000n);
+            expect(gainA).to.be.lte(gainB * 3n + 1000n);
+        });
+
+        it("Should socialize a liquidation shortfall across lenders", async function () {
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(100000));
+            await lendingPool.connect(lender).deposit(toUSDC(100000));
+
+            // Under-collateralized A-band loan: 5,000 borrowed vs 2,000 collateral
+            const shortDuration = 7 * 24 * 60 * 60;
+            await openLoan(toUSDC(2000), shortDuration);
+
+            await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+            await ethers.provider.send("evm_mine");
+            await lendingPool.connect(lender).liquidate(0);
+
+            // NAV = 100,000 − 5,000 (written off) + 2,000 (seized) = 97,000
+            const value = await lendingPool.maxWithdraw(lender.address);
+            expect(value).to.be.gte(toUSDC(97000) - 1000n);
+            expect(value).to.be.lte(toUSDC(97000));
+        });
+
+        it("Should keep donation attacks unprofitable and victim loss negligible", async function () {
+            // Attacker: tiny deposit, then big donation to inflate the share price
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), 1n);
+            await lendingPool.connect(lender).deposit(1n);
+            await usdc.connect(lender).transfer(await lendingPool.getAddress(), toUSDC(10000));
+
+            // Victim deposits normally
+            await usdc.connect(borrower).approve(await lendingPool.getAddress(), toUSDC(5000));
+            await lendingPool.connect(borrower).deposit(toUSDC(5000));
+
+            // Victim keeps ≥ 99.8% of their deposit (virtual-offset protection)
+            const victimValue = await lendingPool.maxWithdraw(borrower.address);
+            expect(victimValue).to.be.gte(toUSDC(5000) * 998n / 1000n);
+
+            // Attacker's position is worth far less than the 10,000 they donated
+            const attackerValue = await lendingPool.maxWithdraw(lender.address);
+            expect(attackerValue).to.be.lt(toUSDC(10000));
+        });
+
+        it("Should exit a full position with redeem() without leaving dust", async function () {
+            await usdc.connect(lender).approve(await lendingPool.getAddress(), toUSDC(10000));
+            await lendingPool.connect(lender).deposit(toUSDC(10000));
+
+            const shares = await lendingPool.sharesOf(lender.address);
+            await lendingPool.connect(lender).redeem(shares);
+
+            expect(await lendingPool.sharesOf(lender.address)).to.equal(0n);
+            expect(await usdc.balanceOf(lender.address)).to.equal(toUSDC(500000));
+        });
+    });
+
+    describe("Admin Events", function () {
+        // Admin actions must be observable on-chain so monitoring can alert on
+        // changes to security-critical parameters.
+        it("Should emit ApprovalSignerUpdated when the signer is rotated", async function () {
+            await expect(lendingPool.setApprovalSigner(lender.address))
+                .to.emit(lendingPool, "ApprovalSignerUpdated")
+                .withArgs(approvalSigner.address, lender.address);
+        });
+
+        it("Should emit InterestRatesUpdated when rates change", async function () {
+            await expect(lendingPool.setInterestRates(400n, 800n, 1200n, 1600n))
+                .to.emit(lendingPool, "InterestRatesUpdated")
+                .withArgs(400n, 800n, 1200n, 1600n);
+        });
+
+        it("Should emit MaxLoanAmountUpdated when the cap changes", async function () {
+            const previous = await lendingPool.maxLoanAmount();
+            await expect(lendingPool.setMaxLoanAmount(toUSDC(250000)))
+                .to.emit(lendingPool, "MaxLoanAmountUpdated")
+                .withArgs(previous, toUSDC(250000));
         });
     });
 
