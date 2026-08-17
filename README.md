@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/vandan08/CredLayer/actions/workflows/ci.yml/badge.svg)](https://github.com/vandan08/CredLayer/actions/workflows/ci.yml)
 [![Security](https://github.com/vandan08/CredLayer/actions/workflows/security.yml/badge.svg)](https://github.com/vandan08/CredLayer/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-128%20passing-brightgreen)](#-testing)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.24-363636)](contracts/contracts)
-[![License](https://img.shields.io/badge/license-MIT-blue)](#)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 A blockchain-based lending platform that enables reputation-based, **under-collateralized** loans. An off-chain risk engine cryptographically co-signs every loan, letting on-chain contracts safely lend at collateral ratios that pure on-chain protocols cannot offer.
 
@@ -14,7 +14,7 @@ Traditional DeFi lending requires significant over-collateralization (often 150%
 
 ### The System Consists of Three Main Layers:
 1. **Smart Contracts** ✅ — Core protocol logic (Solidity 0.8.24, Hardhat). 78 tests.
-2. **Backend Risk Engine** ✅ — Java Spring Boot service that scores borrowers, signs loan approvals, and acts as the on-chain oracle. 41 tests.
+2. **Backend Risk Engine** ✅ — Java Spring Boot service that scores borrowers, signs loan approvals, and acts as the on-chain oracle. 50 tests.
 3. **Frontend dApp** ✅ — Next.js 14 + wagmi/viem. Live on-chain borrow, repay, lend, and DAO voting flows.
 
 📄 **[SECURITY.md](SECURITY.md)** — threat model, trust assumptions, and static-analysis triage
@@ -91,7 +91,7 @@ npm run dev
 
 ```bash
 cd contracts && npx hardhat test     # 78 passing
-cd backend   && mvn test             # 41 passing
+cd backend   && mvn test             # 50 passing
 ```
 
 ## 🔐 Security Features

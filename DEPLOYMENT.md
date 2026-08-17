@@ -43,7 +43,7 @@ ETHERSCAN_API_KEY=<your key>
 Deploy + verify:
 
 ```bash
-npx hardhat test                                  # sanity: 75 passing
+npx hardhat test                                  # sanity: 78 passing
 npx hardhat run scripts/deploy.js --network sepolia
 ```
 
@@ -98,6 +98,10 @@ Set environment variables:
 | `CREDLAYER_ALLOWED_ORIGINS` | `https://<your-app>.vercel.app` |
 
 > Store `CREDLAYER_ORACLE_KEY` as a **secret** (Render "Secret" env var), never in the repo.
+
+> **If the service fails to boot with "Refusing to start: the oracle key is Hardhat's
+> publicly-known account #0 key"** — that is `OracleKeyGuard` doing its job. You pointed the
+> backend at a real RPC endpoint without setting `CREDLAYER_ORACLE_KEY`. Set it and redeploy.
 
 Smoke test once live:
 

@@ -6,6 +6,10 @@ import org.springframework.context.annotation.Configuration;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.http.HttpService;
 
+/**
+ * Web3j client wiring. The oracle credentials that sign against this endpoint are
+ * validated at startup by {@link OracleKeyGuard}.
+ */
 @Configuration
 public class Web3jConfig {
 

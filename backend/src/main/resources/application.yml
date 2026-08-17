@@ -33,6 +33,8 @@ credlayer:
     # CreditRegistry oracle and the LendingPool approvalSigner.
     # ⚠ PRODUCTION: this default is a publicly-known key. ALWAYS override
     #   CREDLAYER_ORACLE_KEY with a dedicated, funded key on real networks.
+    #   OracleKeyGuard enforces this: the app refuses to start if this default
+    #   key is used against a non-local RPC endpoint.
     private-key: "${CREDLAYER_ORACLE_KEY:0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
   security:
     # Comma-separated list of origins allowed to call /api/** (the frontend URL).
