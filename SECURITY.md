@@ -53,6 +53,10 @@ This is an accepted architectural trade-off of hybrid credit scoring, **not** an
 oversight. It is mitigated by, in order of strength:
 
 1. The key is never committed — injected via `CREDLAYER_ORACLE_KEY` (see `DEPLOYMENT.md`).
+   The local-dev default is Hardhat's *published* account #0 key, so forgetting to set
+   `CREDLAYER_ORACLE_KEY` in production would otherwise sign approvals with a key the whole
+   internet holds. `OracleKeyGuard` refuses to start the application when that well-known key
+   is paired with a non-local RPC endpoint, converting a silent compromise into a boot failure.
 2. Signed approvals are single-use and expire in 1 hour, bounding a leaked-signature
    (not leaked-key) incident.
 3. `Pausable` on every state-changing entry point gives the owner an emergency stop.
@@ -154,7 +158,7 @@ Every push and PR runs (`.github/workflows/`):
 | Check | Tool | Gate |
 |---|---|---|
 | Contract behaviour | Hardhat — **78 tests** | must pass |
-| Backend logic | JUnit/Mockito — **41 tests** | must pass |
+| Backend logic | JUnit/Mockito — **50 tests** | must pass |
 | Frontend | `tsc --noEmit`, ESLint, `next build` | must pass |
 | Solidity static analysis | Slither | fails on **High** |
 | Dependency CVEs (production deps) | `npm audit --omit=dev` | fails on **Critical** |
@@ -184,7 +188,7 @@ Findings fixed rather than accepted:
 authorization bypass (plus cache-poisoning and DoS advisories). Upgraded to the
 patched `14.2.35`. Production dependencies now report **zero critical**.
 
-**Accepted, tracked:** eleven `high` advisories remain in production dependencies
+**Accepted, tracked:** twelve `high` advisories remain in production dependencies
 (`next`, `postcss`, and wallet-connector transitives such as `axios`, `ws`, `h3`,
 `hono`, `lodash`). Every one is fixable *only* by a semver-major upgrade:
 
