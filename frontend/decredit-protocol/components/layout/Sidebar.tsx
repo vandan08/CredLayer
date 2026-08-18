@@ -7,6 +7,7 @@ import { useAccount, useConnect, useDisconnect, useBalance } from "wagmi";
 import { clsx } from "clsx";
 
 const navItems = [
+  { label: "← Overview", href: "/" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Borrow", href: "/borrow" },
   { label: "Lend", href: "/lend" },
@@ -131,14 +132,14 @@ function WalletPanel() {
 
 function Logo() {
   return (
-    <div>
-      <div className="font-serif text-xl font-black leading-tight tracking-tight">
-        DeCredit
+    <Link href="/" className="block group" aria-label="CredLayer — back to overview">
+      <div className="font-serif text-xl font-black leading-tight tracking-tight group-hover:text-green transition-colors">
+        CredLayer
       </div>
       <div className="text-[9px] tracking-[3px] uppercase text-ink-muted mt-1 font-mono">
         Protocol v1.0
       </div>
-    </div>
+    </Link>
   );
 }
 
