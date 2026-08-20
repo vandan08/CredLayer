@@ -1,4 +1,14 @@
-export type RiskBand = "A" | "B" | "C" | "D";
+import { BANDS, BAND_ORDER, type Band } from "./risk";
+
+/**
+ * Seeded demo data. Every screen falls back to this when no wallet is
+ * connected, so a visitor can explore the whole protocol without MetaMask,
+ * testnet ETH, or a funded account.
+ *
+ * Scores are on the same 0–1000 scale the contracts use — see lib/risk.ts.
+ */
+
+export type RiskBand = Band;
 
 export interface BorrowerProfile {
   address: string;
@@ -40,28 +50,36 @@ export interface GovernanceProposal {
 
 export const BORROWER: BorrowerProfile = {
   address: "0x71C7...4E3F",
-  score: 742,
+  score: 850, // Band A on the contracts' 0–1000 scale
   band: "A",
-  scoreDelta: 18,
-  maxLoan: 24000,
-  collateralPct: 40,
-  interestRate: 5.0,
+  scoreDelta: 20,
+  maxLoan: BANDS.A.maxLoanUsdc,
+  collateralPct: BANDS.A.collateralPct,
+  interestRate: BANDS.A.interestPct,
   liquidationThreshold: 35,
-  totalBorrowed: 8400,
+  totalBorrowed: 9300, // sum of LOANS below
   repaymentRate: 100,
   poolSupplied: 2000,
   defaults: 0,
 };
 
+/**
+ * The ledger tells the protocol's story in reverse: the borrower starts in
+ * Band C paying 12%, repays consistently, and works down to Band A at 5%.
+ * Rates are the real band rates — nothing here is a number the protocol
+ * would not actually charge.
+ */
 export const LOANS: Loan[] = [
-  { id: "#LN-00041", amount: 3200, duration: "30 days", rate: 5.0,  status: "Active",  date: "Feb 12, 2026", dueDate: "Mar 14, 2026" },
-  { id: "#LN-00038", amount: 2800, duration: "45 days", rate: 5.0,  status: "Repaid",  date: "Dec 01, 2025", dueDate: "Jan 15, 2026" },
-  { id: "#LN-00031", amount: 1600, duration: "30 days", rate: 7.2,  status: "Repaid",  date: "Sep 18, 2025", dueDate: "Oct 18, 2025" },
-  { id: "#LN-00024", amount: 800,  duration: "14 days", rate: 9.0,  status: "Repaid",  date: "Jun 03, 2025", dueDate: "Jun 17, 2025" },
-  { id: "#LN-00017", amount: 2100, duration: "60 days", rate: 14.0, status: "Repaid",  date: "Jan 10, 2025", dueDate: "Mar 11, 2025" },
+  { id: "#LN-00041", amount: 3200, duration: "30 days", rate: BANDS.A.interestPct, status: "Active", date: "Feb 12, 2026", dueDate: "Mar 14, 2026" },
+  { id: "#LN-00038", amount: 2800, duration: "45 days", rate: BANDS.A.interestPct, status: "Repaid", date: "Dec 01, 2025", dueDate: "Jan 15, 2026" },
+  { id: "#LN-00031", amount: 1600, duration: "30 days", rate: BANDS.B.interestPct, status: "Repaid", date: "Sep 18, 2025", dueDate: "Oct 18, 2025" },
+  { id: "#LN-00024", amount: 800,  duration: "14 days", rate: BANDS.B.interestPct, status: "Repaid", date: "Jun 03, 2025", dueDate: "Jun 17, 2025" },
+  { id: "#LN-00017", amount: 900,  duration: "60 days", rate: BANDS.C.interestPct, status: "Repaid", date: "Jan 10, 2025", dueDate: "Mar 11, 2025" },
 ];
 
-export const SCORE_HISTORY = [480, 510, 495, 540, 580, 610, 590, 640, 670, 700, 728, 742];
+// 0–1000 scale. The dip at month 3 is a late repayment; the climb past 600
+// and 800 is where the borrower crosses into Band B and then Band A.
+export const SCORE_HISTORY = [500, 540, 520, 580, 620, 660, 640, 700, 740, 780, 820, 850];
 export const SCORE_MONTHS  = ["Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
 
 export const PROPOSALS: GovernanceProposal[] = [
@@ -111,9 +129,27 @@ export const POOL_DATA = {
   liquidityProviders: 847,
 };
 
-export const BAND_CONFIG: Record<RiskBand, { collateral: number; rate: number; label: string; color: string }> = {
-  A: { collateral: 40,  rate: 5.0,  label: "750+",    color: "#C6F135" },
-  B: { collateral: 70,  rate: 9.0,  label: "650–749", color: "#1A1915" },
-  C: { collateral: 110, rate: 14.0, label: "500–649", color: "#B45309" },
-  D: { collateral: 150, rate: 20.0, label: "<500",    color: "#9B1C1C" },
-};
+/**
+ * Derived from the single source of truth in lib/risk.ts so the dashboard,
+ * the borrow form and the landing page can never quote different numbers
+ * than the contracts enforce.
+ */
+export const BAND_CONFIG: Record<
+  RiskBand,
+  { collateral: number; rate: number; maxLoan: number; label: string; color: string }
+> = Object.fromEntries(
+  BAND_ORDER.map((b) => {
+    const t = BANDS[b];
+    const upper = b === "A" ? 1000 : BANDS[BAND_ORDER[BAND_ORDER.indexOf(b) - 1]].floor - 1;
+    return [
+      b,
+      {
+        collateral: t.collateralPct,
+        rate: t.interestPct,
+        maxLoan: t.maxLoanUsdc,
+        label: b === "A" ? `${t.floor}+` : `${t.floor}–${upper}`,
+        color: t.color,
+      },
+    ];
+  })
+) as Record<RiskBand, { collateral: number; rate: number; maxLoan: number; label: string; color: string }>;

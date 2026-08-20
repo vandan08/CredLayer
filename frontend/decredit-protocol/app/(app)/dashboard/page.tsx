@@ -3,21 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { BORROWER, LOANS, SCORE_HISTORY, SCORE_MONTHS, BAND_CONFIG, type RiskBand } from "@/lib/data";
+import { bandForScore, BANDS, BAND_ORDER, MAX_SCORE, MIN_SCORE } from "@/lib/risk";
 import { CREDIT_REGISTRY_ABI, LENDING_POOL_ABI, ADDRESSES } from "@/lib/web3/contracts";
 import { clsx } from "clsx";
 
-const SCORE_MAX = 850;
-const SCORE_MIN = 300;
+// Scores are the contracts' native 0–1000 range — no display rescaling, so
+// the number on screen is literally the number in CreditRegistry storage.
+const SCORE_MAX = MAX_SCORE;
+const SCORE_MIN = MIN_SCORE;
 const SEGMENTS = 28;
 
 // ─── Helpers ────────────────────────────────────────────────────
 
-function scoreToBand(score: number): RiskBand {
-  if (score >= 750) return "A";
-  if (score >= 650) return "B";
-  if (score >= 500) return "C";
-  return "D";
-}
+const scoreToBand = bandForScore;
 
 // ─── Components ─────────────────────────────────────────────────
 
@@ -26,14 +24,24 @@ function VUMeter({ score }: { score: number }) {
   const scorePct = (score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN);
   const targetActive = Math.round(scorePct * SEGMENTS);
 
+  // Time-based rather than tick-based: a fixed-step interval silently
+  // stretches to many seconds whenever a frame costs more than the step,
+  // which is exactly what happens on a page this busy.
   useEffect(() => {
-    let i = 0;
-    const t = setInterval(() => {
-      i++;
-      setActiveCount(i);
-      if (i >= targetActive) clearInterval(t);
-    }, 40);
-    return () => clearInterval(t);
+    const DURATION = 900;
+    let raf = 0;
+    // Anchored on the first delivered frame, not on effect time: rAF is
+    // paused in a background tab, so a page opened in one would otherwise
+    // "finish" its animation before the reader ever looks at it.
+    let start = 0;
+    const step = (now: number) => {
+      if (!start) start = now;
+      const p = Math.min(1, (now - start) / DURATION);
+      setActiveCount(Math.round(p * targetActive));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [targetActive]);
 
   return (
@@ -45,9 +53,11 @@ function VUMeter({ score }: { score: number }) {
           const isActive = i < activeCount;
           let color = "bg-surface-2";
           if (isActive) {
-            if (pct <= 0.35) color = "bg-crimson";
-            else if (pct <= 0.59) color = "bg-amber";
-            else if (pct <= 0.76) color = "bg-ink";
+            const segScore = pct * SCORE_MAX;
+            const segBand = scoreToBand(segScore);
+            if (segBand === "D") color = "bg-crimson";
+            else if (segBand === "C") color = "bg-amber";
+            else if (segBand === "B") color = "bg-ink";
             else color = "bg-chartreuse";
           }
           return (
@@ -60,10 +70,11 @@ function VUMeter({ score }: { score: number }) {
         })}
       </div>
       <div className="flex justify-between text-[9px] tracking-[2px] uppercase text-ink-faint font-mono">
-        <span>300 — D</span>
-        <span>500 — C</span>
-        <span>650 — B</span>
-        <span>750+ — A</span>
+        {[...BAND_ORDER].reverse().map((b) => (
+          <span key={b}>
+            {BANDS[b].floor}{b === "A" ? "+" : ""} — {b}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -86,7 +97,11 @@ function Sparkline({ data, months }: { data: number[]; months: string[] }) {
 
     const w = canvas.offsetWidth;
     const h = canvas.offsetHeight;
-    const minV = 400, maxV = 800;
+    // Fit the plot to the series with a little headroom, so the trend stays
+    // readable whatever range the scores actually occupy.
+    const lo = Math.min(...data), hi = Math.max(...data);
+    const pad = Math.max(20, (hi - lo) * 0.15);
+    const minV = lo - pad, maxV = hi + pad;
     const px = (v: number) => h - ((v - minV) / (maxV - minV)) * (h - 20) - 4;
 
     let progress = 0;
@@ -169,16 +184,23 @@ function Sparkline({ data, months }: { data: number[]; months: string[] }) {
 }
 
 function ScoreDigits({ score }: { score: number }) {
-  const [displayed, setDisplayed] = useState(300);
+  const [displayed, setDisplayed] = useState(SCORE_MIN);
+
+  // Runs on wall-clock time with an ease-out, so the headline number always
+  // lands in ~1.1s no matter how expensive the surrounding frame is.
   useEffect(() => {
-    const step = (score - 300) / 40;
-    let current = 300;
-    const t = setInterval(() => {
-      current = Math.min(score, current + step);
-      setDisplayed(Math.round(current));
-      if (current >= score) clearInterval(t);
-    }, 20);
-    return () => clearInterval(t);
+    const DURATION = 1100;
+    let raf = 0;
+    let start = 0; // see VUMeter: anchor on the first delivered frame
+    const step = (now: number) => {
+      if (!start) start = now;
+      const p = Math.min(1, (now - start) / DURATION);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplayed(Math.round(SCORE_MIN + (score - SCORE_MIN) * eased));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [score]);
 
   return (
@@ -232,8 +254,8 @@ export default function Dashboard() {
 
   // ── Derive values (fallback to mock data when not connected) ──
   const liveScore = rawScore ? Number(rawScore) : null;
-  const score = liveScore !== null ? Math.round(liveScore * 850 / 1000) : BORROWER.score;
-  const band = liveScore !== null ? scoreToBand(score) : BORROWER.band;
+  const score = liveScore !== null ? liveScore : BORROWER.score;
+  const band = scoreToBand(score);
   const cfg = BAND_CONFIG[band];
 
   const totalDeposits = rawTotalDeposits ? Number(rawTotalDeposits) / 1e6 : 4210000;
@@ -315,7 +337,7 @@ export default function Dashboard() {
           <VUMeter score={score} />
           <div className="mt-8 space-y-0">
             {[
-              ["Max Loan Amount", `$${cfg.collateral > 100 ? "5,000" : "24,000"} USDC`, "good"],
+              ["Max Loan Amount", `$${cfg.maxLoan.toLocaleString()} USDC`, "good"],
               ["Required Collateral", `${cfg.collateral}%`, "good"],
               ["Interest Rate", `${cfg.rate.toFixed(2)}% APR`, "good"],
               ["Liquidation Threshold", `${Math.max(35, cfg.collateral - 5)}%`, "warn"],

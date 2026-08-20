@@ -3,12 +3,16 @@
 import { useAccount, useReadContract } from "wagmi";
 import { LENDING_POOL_ABI, ADDRESSES } from "@/lib/web3/contracts";
 import { formatUnits } from "viem";
+import { BANDS, BAND_ORDER } from "@/lib/risk";
+
+/** Band rate strings, derived so the ticker can never drift from the contracts. */
+const BAND_RATES = BAND_ORDER.map(
+  (b) => `BAND ${b} RATE ${BANDS[b].interestPct.toFixed(2)}%`
+);
 
 const items = [
   "POOL UTILIZATION 72.4%",
-  "BAND A RATE 5.00%",
-  "BAND B RATE 9.00%",
-  "BAND C RATE 14.00%",
+  ...BAND_RATES,
   "TOTAL VALUE LOCKED $4.21M",
   "ACTIVE LOANS 1,204",
   "AVG CREDIT SCORE 718",
@@ -42,9 +46,7 @@ export function Ticker() {
 
   const liveItems = [
     `POOL UTILIZATION ${utilization}%`,
-    "BAND A RATE 5.00%",
-    "BAND B RATE 9.00%",
-    "BAND C RATE 14.00%",
+    ...BAND_RATES,
     `TOTAL VALUE LOCKED ${tvlFormatted}`,
     "ACTIVE LOANS 1,204",
     "AVG CREDIT SCORE 718",

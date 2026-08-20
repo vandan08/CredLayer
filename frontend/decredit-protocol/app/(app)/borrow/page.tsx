@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 import { type RiskBand } from "@/lib/data";
+import { BANDS, BAND_ORDER, bandForScore } from "@/lib/risk";
 import {
   LENDING_POOL_ABI,
   ERC20_ABI,
@@ -26,23 +27,39 @@ const DURATIONS = [
 ];
 
 /**
- * Risk-band terms on the protocol's native 0–1000 credit scale.
- * collateral% and maxLoan mirror the backend RiskModelService (what gets
- * signed); rate mirrors the LendingPool contract (what the loan actually pays).
+ * Risk-band terms, derived from lib/risk.ts — the single mirror of
+ * CreditRegistry.sol's thresholds, CollateralVault.sol's LTV constants and
+ * the Java risk engine's rate/ceiling table. Never redeclare them here.
  */
-const ONCHAIN_BANDS: Record<RiskBand, { min: number; label: string; collateral: number; rate: number; maxLoan: number; color: string }> = {
-  A: { min: 800, label: "800–1000", collateral: 40, rate: 5, maxLoan: 10_000, color: "#C6F135" },
-  B: { min: 600, label: "600–799", collateral: 70, rate: 9, maxLoan: 5_000, color: "#1A1915" },
-  C: { min: 400, label: "400–599", collateral: 110, rate: 14, maxLoan: 1_000, color: "#B45309" },
-  D: { min: 0, label: "0–399", collateral: 150, rate: 14, maxLoan: 50, color: "#9B1C1C" },
-};
+const ONCHAIN_BANDS: Record<
+  RiskBand,
+  { min: number; label: string; collateral: number; rate: number; maxLoan: number; color: string }
+> = Object.fromEntries(
+  BAND_ORDER.map((b) => {
+    const t = BANDS[b];
+    const upper = b === "A" ? 1000 : BANDS[BAND_ORDER[BAND_ORDER.indexOf(b) - 1]].floor - 1;
+    return [
+      b,
+      {
+        min: t.floor,
+        label: `${t.floor}–${upper}`,
+        collateral: t.collateralPct,
+        rate: t.interestPct,
+        maxLoan: t.maxLoanUsdc,
+        color: t.color,
+      },
+    ];
+  })
+) as Record<
+  RiskBand,
+  { min: number; label: string; collateral: number; rate: number; maxLoan: number; color: string }
+>;
 
-function scoreToBand(score: number): RiskBand {
-  if (score >= 800) return "A";
-  if (score >= 600) return "B";
-  if (score >= 400) return "C";
-  return "D";
-}
+const scoreToBand = bandForScore;
+
+/** Currency with thousands separators and cents — "5,020.55", not "5020.55". */
+const money = (n: number) =>
+  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type BtnState =
   | "idle"
@@ -358,8 +375,8 @@ export default function BorrowPage() {
                 { k: `Collateral (${terms.collateral}%)`, v: `$${collateral.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, accent: true },
                 { k: "APR", v: `${terms.rate.toFixed(2)}%` },
                 { k: "Duration", v: duration.label },
-                { k: "Interest", v: `$${interest.toFixed(2)}` },
-                { k: "Total Repayable", v: `$${totalRepay.toFixed(2)}`, bold: true },
+                { k: "Interest", v: `$${money(interest)}` },
+                { k: "Total Repayable", v: `$${money(totalRepay)}`, bold: true },
               ].map(({ k, v, accent, bold }) => (
                 <div key={k} className={clsx("risk-row", bold && "border-t border-ink mt-1")}>
                   <span className="text-ink-muted font-mono">{k}</span>

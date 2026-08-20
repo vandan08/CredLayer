@@ -8,6 +8,23 @@
 
 A blockchain-based lending platform that enables reputation-based, **under-collateralized** loans. An off-chain risk engine cryptographically co-signs every loan, letting on-chain contracts safely lend at collateral ratios that pure on-chain protocols cannot offer.
 
+## 🔗 Live Demo
+
+**→ [credlayer.vercel.app](https://credlayer.vercel.app)** *(update this link after your Vercel deploy)*
+
+**No wallet required.** The landing page explains the mechanism and includes an
+interactive risk-engine simulator that runs the protocol's real band logic in the
+browser. Every app screen — dashboard, borrow, lend, history, governance — falls
+back to seeded demo data when no wallet is connected, so the product is fully
+explorable without MetaMask or testnet funds.
+
+Connect MetaMask on Sepolia to switch the same UI onto live on-chain reads and writes.
+
+> **Single source of truth:** score thresholds, collateral ratios, interest rates and
+> loan ceilings live in [`frontend/decredit-protocol/lib/risk.ts`](frontend/decredit-protocol/lib/risk.ts),
+> mirrored from `CreditRegistry.sol`, `CollateralVault.sol` and the backend
+> `RiskModelService`. The UI cannot drift from what the contracts enforce.
+
 ## 🌟 Project Overview
 
 Traditional DeFi lending requires significant over-collateralization (often 150%+). CredLayer enables under-collateralized borrowing (down to 40% LTV) using an off-chain risk scoring engine. Borrowers with high credit scores and good repayment histories are rewarded with lower collateral requirements and better interest rates.
