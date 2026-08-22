@@ -8,7 +8,7 @@
  */
 export function FlowDiagram() {
   return (
-    <div className="border border-ink bg-bg overflow-x-auto">
+    <div className="border border-ink bg-bg/75 overflow-x-auto">
       <svg
         viewBox="0 0 900 420"
         className="w-full min-w-[720px] h-auto block"

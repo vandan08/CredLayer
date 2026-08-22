@@ -56,7 +56,7 @@ export function RiskSimulator() {
   const pointsToNext = nextBand ? BANDS[nextBand].floor - score : 0;
 
   return (
-    <div className="border border-ink bg-bg">
+    <div className="border border-ink bg-bg/75">
       {/* Header */}
       <div className="border-b border-ink px-6 md:px-8 py-5 flex flex-wrap items-baseline justify-between gap-3">
         <div>

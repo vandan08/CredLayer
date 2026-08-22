@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { RiskSimulator } from "@/components/landing/RiskSimulator";
 import { FlowDiagram } from "@/components/landing/FlowDiagram";
+import { VideoBackdrop } from "@/components/landing/VideoBackdrop";
+import { LandingNav } from "@/components/landing/LandingNav";
 import { ADDRESSES, isDeployed } from "@/lib/web3/contracts";
 import { BANDS, BAND_ORDER } from "@/lib/risk";
 
@@ -71,76 +73,67 @@ function Shell({ children, className = "" }: { children: React.ReactNode; classN
 
 export default function Landing() {
   return (
-    <div className="min-h-screen">
-      {/* ══ Nav ══ */}
-      <header className="sticky top-0 z-50 bg-bg/95 backdrop-blur border-b border-ink">
-        <div className="max-w-[1180px] mx-auto px-6 md:px-10 lg:px-16 h-[68px] flex items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-[2px]">
-              <div className="w-[10px] h-[10px] border border-ink" />
-              <div className="w-[10px] h-[10px] bg-chartreuse" />
-              <div className="w-[10px] h-[10px] border border-ink" />
-            </div>
-            <span className="font-serif text-[19px] font-black tracking-[-0.5px] leading-none">
-              CredLayer
+    <div className="relative z-0 min-h-screen">
+      <VideoBackdrop />
+
+      <LandingNav />
+
+      {/* ══ Hero ══
+          The clip is the subject here and the copy is a caption on top of it.
+          Everything that asks to be read — the argument, the band table — now
+          starts in the section below, where the page turns back into paper. */}
+      <section
+        data-hero
+        className="relative min-h-[100svh] -mt-[68px] flex flex-col justify-end overflow-hidden"
+      >
+        {/* Scrims: enough contrast to read against, not so much that the clip
+            flattens into a texture. */}
+        <div className="absolute inset-x-0 top-0 h-[240px] bg-gradient-to-b from-ink/70 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-[75%] bg-gradient-to-t from-ink/88 via-ink/55 to-transparent pointer-events-none" />
+
+        <div className="relative max-w-[1180px] w-full mx-auto px-6 md:px-10 lg:px-16 pt-32 pb-16 md:pb-20">
+          <div className="inline-flex items-center gap-2 border border-bg/25 bg-ink/25 px-3 py-[7px] mb-8">
+            <span className="w-[6px] h-[6px] bg-chartreuse block status-dot" />
+            <span className="text-[9px] tracking-[2.5px] uppercase font-mono text-bg/85">
+              {IS_SEPOLIA ? "Live on Sepolia testnet" : "Full-stack DeFi protocol"}
             </span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-7">
-            {[
-              ["Mechanism", "#mechanism"],
-              ["Simulator", "#simulator"],
-              ["Architecture", "#architecture"],
-              ["On-chain", "#onchain"],
-            ].map(([label, href]) => (
-              <a
-                key={href}
-                href={href}
-                className="text-[10px] tracking-[2px] uppercase font-mono text-ink-muted hover:text-ink transition-colors"
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
+          <h1
+            className="font-serif text-bg text-[46px] sm:text-[64px] lg:text-[82px] font-black tracking-[-3px] leading-[0.94] mb-8 max-w-[900px]"
+            style={{ textShadow: "0 2px 30px rgba(26,25,21,0.45)" }}
+          >
+            Lending priced by{" "}
+            <br className="hidden sm:block" />
+            reputation, not{" "}
+            <br className="hidden sm:block" />
+            just collateral.
+          </h1>
 
-          <div className="flex items-center gap-2">
-            <a
-              href={GITHUB}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:block px-4 py-[9px] text-[9px] tracking-[2px] uppercase font-mono font-semibold border border-ink text-ink hover:bg-surface transition-all"
-            >
-              Source
-            </a>
-            <Link
-              href="/dashboard"
-              className="px-5 py-[10px] text-[9px] tracking-[2px] uppercase font-mono font-semibold border-2 border-ink bg-ink text-bg hover:bg-green hover:border-green hover:text-chartreuse transition-all"
-            >
-              Launch App
-            </Link>
-          </div>
+          <p
+            className="text-[12px] md:text-[13px] font-mono text-bg/90 leading-[1.9] max-w-[540px]"
+            style={{ textShadow: "0 1px 16px rgba(26,25,21,0.7)" }}
+          >
+            An off-chain risk engine scores every wallet from its repayment history
+            and cryptographically co-signs each loan — so the contract can safely
+            lend at{" "}
+            <span className="text-chartreuse font-semibold">40% collateral</span>{" "}
+            where pure on-chain protocols demand 150%.
+          </p>
         </div>
-      </header>
 
-      {/* ══ Hero ══ */}
-      <Shell className="pt-14 md:pt-20 pb-10 md:pb-14">
+        <div className="relative max-w-[1180px] w-full mx-auto px-6 md:px-10 lg:px-16 pb-8 flex items-center justify-end gap-3">
+          <span className="text-[9px] tracking-[3px] uppercase font-mono text-bg/70">
+            Scroll
+          </span>
+          <span className="w-[7px] h-[7px] bg-chartreuse block" />
+        </div>
+      </section>
+
+      {/* ══ The argument ══ */}
+      <Shell className="border-b border-border">
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-16 items-start">
           <div>
-            <div className="inline-flex items-center gap-2 border border-border bg-surface px-3 py-[7px] mb-8">
-              <span className="w-[6px] h-[6px] bg-chartreuse block status-dot" />
-              <span className="text-[9px] tracking-[2.5px] uppercase font-mono text-ink-muted">
-                {IS_SEPOLIA ? "Live on Sepolia testnet" : "Full-stack DeFi protocol"}
-              </span>
-            </div>
-
-            <h1 className="font-serif text-[46px] sm:text-[62px] lg:text-[76px] font-black tracking-[-3px] leading-[0.94] mb-7">
-              Lending priced by
-              <br />
-              reputation, not
-              <br />
-              just collateral.
-            </h1>
-
             <p className="text-[13px] md:text-[14px] font-mono text-ink-muted leading-[1.85] max-w-[560px] mb-4">
               Conventional DeFi money markets demand{" "}
               <span className="text-ink font-semibold">150% collateral</span> because a
@@ -155,22 +148,7 @@ export default function Landing() {
               safely lend at <span className="text-ink font-semibold">40%</span>.
             </p>
 
-            <div className="flex flex-wrap gap-3 mb-7">
-              <Link
-                href="/dashboard"
-                className="px-7 py-4 text-[10px] tracking-[2.5px] uppercase font-mono font-bold border-2 border-ink bg-ink text-bg hover:bg-green hover:border-green hover:text-chartreuse transition-all"
-              >
-                Explore the app →
-              </Link>
-              <a
-                href="#simulator"
-                className="px-7 py-4 text-[10px] tracking-[2.5px] uppercase font-mono font-bold border-2 border-ink text-ink hover:bg-chartreuse transition-all"
-              >
-                Try the risk engine
-              </a>
-            </div>
-
-            <div className="border-l-2 border-l-chartreuse bg-surface px-4 py-3 max-w-[560px]">
+            <div className="border-l-2 border-l-chartreuse bg-surface/70 px-4 py-3 max-w-[560px]">
               <p className="text-[10px] font-mono text-ink-muted leading-relaxed">
                 <span className="text-ink font-semibold">No wallet needed.</span> Every
                 screen is explorable with seeded demo data. Connect MetaMask on{" "}
@@ -181,7 +159,7 @@ export default function Landing() {
           </div>
 
           {/* Band table */}
-          <div className="border border-ink">
+          <div className="border border-ink bg-bg/60">
             <div className="bg-ink px-5 py-3 flex items-baseline justify-between">
               <span className="text-[9px] tracking-[2.5px] uppercase font-mono font-bold text-chartreuse">
                 Risk Bands
@@ -205,7 +183,7 @@ export default function Landing() {
               return (
                 <div
                   key={b}
-                  className="grid grid-cols-[auto_1fr_auto_auto] items-center border-b border-border last:border-b-0 hover:bg-surface transition-colors"
+                  className="grid grid-cols-[auto_1fr_auto_auto] items-center border-b border-border last:border-b-0 hover:bg-surface/70 transition-colors"
                 >
                   <div className="px-4 py-4">
                     <div
@@ -233,7 +211,7 @@ export default function Landing() {
               );
             })}
 
-            <div className="bg-surface px-5 py-4 border-t border-ink">
+            <div className="bg-surface/70 px-5 py-4 border-t border-ink">
               <p className="text-[9px] font-mono text-ink-muted leading-relaxed">
                 Band A borrowers lock <span className="text-ink font-semibold">$0.40</span> per
                 dollar borrowed. A 150% pool locks{" "}
@@ -246,7 +224,7 @@ export default function Landing() {
       </Shell>
 
       {/* ══ Stat band ══ */}
-      <div className="border-y border-ink bg-ink">
+      <div className="border-y border-ink bg-ink/90">
         <div className="max-w-[1180px] mx-auto px-6 md:px-10 lg:px-16 grid grid-cols-2 md:grid-cols-4 divide-x divide-ink-muted/30">
           {[
             { v: "40%", k: "Best-case collateral" },
@@ -299,7 +277,7 @@ export default function Landing() {
               d: "msg.sender is part of the hash. A leaked signature is worthless to anyone but the wallet it names.",
             },
           ].map((c) => (
-            <div key={c.t} className="bg-bg p-7">
+            <div key={c.t} className="bg-bg/75 p-7">
               <div className="w-2 h-2 bg-chartreuse mb-5" />
               <h3 className="font-serif text-[20px] font-bold mb-3 tracking-[-0.5px]">{c.t}</h3>
               <p className="text-[10px] font-mono text-ink-muted leading-[1.8]">{c.d}</p>
@@ -372,7 +350,7 @@ export default function Landing() {
               ],
             },
           ].map((l) => (
-            <div key={l.t} className="bg-bg p-7 md:p-8">
+            <div key={l.t} className="bg-bg/75 p-7 md:p-8">
               <div className="flex items-baseline justify-between mb-5">
                 <span className="font-serif text-[38px] font-black leading-none text-ink-faint">
                   {l.n}
@@ -422,7 +400,7 @@ export default function Landing() {
           )}
         </p>
 
-        <div className="border border-ink">
+        <div className="border border-ink bg-bg/60">
           {CONTRACTS.map((c, i) => {
             const deployed = isDeployed(c.address as `0x${string}`);
             const body = (
@@ -454,7 +432,7 @@ export default function Landing() {
             );
 
             const cls =
-              "block border-border hover:bg-surface transition-colors " +
+              "block border-border hover:bg-surface/70 transition-colors " +
               (i < CONTRACTS.length - 1 ? "border-b" : "");
 
             return IS_SEPOLIA && deployed ? (
@@ -490,7 +468,7 @@ export default function Landing() {
               ["Threat model", "Documented trust assumptions and static-analysis triage in SECURITY.md"],
               ["Secrets", "Env-driven throughout; the container runs as a non-root user"],
             ].map(([k, v]) => (
-              <div key={k} className="bg-bg px-6 py-5">
+              <div key={k} className="bg-bg/75 px-6 py-5">
                 <div className="text-[9px] tracking-[2.5px] uppercase font-mono text-ink-faint mb-2">
                   {k}
                 </div>
@@ -527,7 +505,7 @@ export default function Landing() {
       </Shell>
 
       {/* ══ Footer CTA ══ */}
-      <footer className="bg-ink text-bg">
+      <footer className="bg-ink/90 text-bg">
         <div className="max-w-[1180px] mx-auto px-6 md:px-10 lg:px-16 py-16 md:py-20">
           <h2 className="font-serif text-[36px] md:text-[54px] font-black tracking-[-2px] leading-[1] mb-8 max-w-[760px]">
             Open the dashboard.
